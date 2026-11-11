@@ -1,0 +1,70 @@
+# Variables de entorno y secretos (TR.01.03)
+.env
+.env.*
+!.env.example
+!.env.test.example
+
+# Dependencias (Node.js / Python / General)
+node_modules/
+bower_components/
+jspm_packages/
+.pnp
+.pnp.js
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+
+# Builds y artefactos de compilación
+dist/
+build/
+out/
+.next/
+.nuxt/
+.output/
+.vite/
+.cache/
+*.tsbuildinfo
+
+# Cobertura y reportes de pruebas
+coverage/
+.nyc_output/
+.pytest_cache/
+htmlcov/
+.coverage
+playwright-report/
+test-results/
+
+# Bases de datos locales y datos temporales
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+database/local_data/
+postgres-data/
+mysql-data/
+tmp/
+temp/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editores y Sistema Operativo
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini

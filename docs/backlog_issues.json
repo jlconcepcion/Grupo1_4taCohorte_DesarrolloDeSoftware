@@ -1,0 +1,394 @@
+[
+  {
+    "id": "TR.01",
+    "historia": "TR",
+    "sprint": "Sprint 1",
+    "area": "Infra",
+    "subtarea": "Crear el repositorio, la estructura de carpetas y la guía de contribución del equipo.",
+    "criterio": "Repositorio clonable por todos los integrantes; README con pasos de instalación."
+  },
+  {
+    "id": "TR.02",
+    "historia": "TR",
+    "sprint": "Sprint 1",
+    "area": "Infra",
+    "subtarea": "Configurar entornos de desarrollo y pruebas con variables de entorno separadas.",
+    "criterio": "La app levanta en local con una sola instrucción documentada."
+  },
+  {
+    "id": "TR.03",
+    "historia": "TR",
+    "sprint": "Sprint 1",
+    "area": "BD",
+    "subtarea": "Diseñar el modelo entidad-relación completo (usuarios, roles, recintos, clases, bloques de disponibilidad, reservas, sugerencias).",
+    "criterio": "Diagrama aprobado por el equipo y revisado contra las historias HU01 a HU05."
+  },
+  {
+    "id": "TR.04",
+    "historia": "TR",
+    "sprint": "Sprint 1",
+    "area": "Infra",
+    "subtarea": "Configurar un flujo básico de integración continua que corra las pruebas en cada cambio.",
+    "criterio": "Pipeline ejecutado en cada push; falla si una prueba falla."
+  },
+  {
+    "id": "ST01.01",
+    "historia": "HU01",
+    "sprint": "Sprint 1",
+    "area": "BD",
+    "subtarea": "Crear la tabla de usuarios: id, correo único, contraseña cifrada, rol, estado activo y fecha de creación.",
+    "criterio": "Migración aplicada; correo duplicado rechazado a nivel de base de datos."
+  },
+  {
+    "id": "ST01.02",
+    "historia": "HU01",
+    "sprint": "Sprint 1",
+    "area": "Backend",
+    "subtarea": "Implementar el cifrado de contraseñas con un algoritmo de hash seguro (bcrypt o argon2).",
+    "criterio": "Ninguna contraseña aparece en texto plano en la base ni en los logs."
+  },
+  {
+    "id": "ST01.03",
+    "historia": "HU01",
+    "sprint": "Sprint 1",
+    "area": "Backend",
+    "subtarea": "Endpoint de registro del cliente con validación de correo y longitud mínima de contraseña.",
+    "criterio": "Datos inválidos devuelven error 400 con mensaje claro; registro válido crea el usuario con rol cliente."
+  },
+  {
+    "id": "ST01.04",
+    "historia": "HU01",
+    "sprint": "Sprint 1",
+    "area": "Backend",
+    "subtarea": "Endpoint de inicio de sesión y manejo de sesión (token o cookie) con caducidad.",
+    "criterio": "Credenciales incorrectas devuelven un mensaje genérico; la sesión expira según el tiempo configurado."
+  },
+  {
+    "id": "ST01.05",
+    "historia": "HU01",
+    "sprint": "Sprint 1",
+    "area": "Backend",
+    "subtarea": "Definir la matriz de permisos por rol (cliente, coordinador, instructor, administrador) e implementarla como middleware.",
+    "criterio": "Cada ruta protegida rechaza con 403 a roles no autorizados; la matriz está documentada."
+  },
+  {
+    "id": "ST01.06",
+    "historia": "HU01",
+    "sprint": "Sprint 1",
+    "area": "Frontend",
+    "subtarea": "Crear las pantallas de registro e inicio de sesión, responsivas para celular.",
+    "criterio": "Formularios usables en pantallas de 360 px; errores visibles junto a cada campo."
+  },
+  {
+    "id": "ST01.07",
+    "historia": "HU01",
+    "sprint": "Sprint 1",
+    "area": "Backend",
+    "subtarea": "Permitir que el administrador cree usuarios e instructores y les asigne un rol.",
+    "criterio": "El usuario creado puede iniciar sesión solo con las funciones de su rol."
+  },
+  {
+    "id": "ST01.08",
+    "historia": "HU01",
+    "sprint": "Sprint 1",
+    "area": "Pruebas",
+    "subtarea": "Pruebas de autenticación: registro, login correcto, login fallido y acceso denegado por rol.",
+    "criterio": "Suite de pruebas en verde; cobertura de los casos de rechazo."
+  },
+  {
+    "id": "ST02.01",
+    "historia": "HU02",
+    "sprint": "Sprint 2",
+    "area": "BD",
+    "subtarea": "Crear las tablas de recintos, clases y bloques de disponibilidad con sus claves foráneas.",
+    "criterio": "Migración aplicada; un bloque no puede existir sin instructor ni recinto."
+  },
+  {
+    "id": "ST02.02",
+    "historia": "HU02",
+    "sprint": "Sprint 2",
+    "area": "Backend",
+    "subtarea": "CRUD de recintos para el administrador: crear, editar y desactivar (nombre, tipo, estado).",
+    "criterio": "Un recinto desactivado no aparece en las consultas de clientes, pero conserva su historial."
+  },
+  {
+    "id": "ST02.03",
+    "historia": "HU02",
+    "sprint": "Sprint 2",
+    "area": "Frontend",
+    "subtarea": "Pantalla de recintos para el administrador.",
+    "criterio": "El administrador puede crear y desactivar un recinto sin tocar la base de datos."
+  },
+  {
+    "id": "ST02.04",
+    "historia": "HU02",
+    "sprint": "Sprint 2",
+    "area": "Backend",
+    "subtarea": "CRUD de clases para el instructor: nombre, tipo de rutina y recinto (solo recintos activos).",
+    "criterio": "El instructor no puede asignar una clase a un recinto inactivo."
+  },
+  {
+    "id": "ST02.05",
+    "historia": "HU02",
+    "sprint": "Sprint 2",
+    "area": "Backend",
+    "subtarea": "Registrar bloques de disponibilidad: día, hora de inicio y hora de fin.",
+    "criterio": "Se rechaza hora_fin <= hora_inicio con mensaje claro."
+  },
+  {
+    "id": "ST02.06",
+    "historia": "HU02",
+    "sprint": "Sprint 2",
+    "area": "Backend",
+    "subtarea": "Validar que los bloques de un mismo instructor no se solapen en el mismo día.",
+    "criterio": "Un bloque de 5:00 p. m. a 7:00 p. m. es rechazado si ya existe uno de 4:00 p. m. a 6:00 p. m. el mismo día."
+  },
+  {
+    "id": "ST02.07",
+    "historia": "HU02",
+    "sprint": "Sprint 2",
+    "area": "Backend",
+    "subtarea": "Editar y eliminar bloques propios; no permitir eliminar bloques con reservas activas.",
+    "criterio": "Intento de eliminar un bloque con reservas activas devuelve error y no borra nada."
+  },
+  {
+    "id": "ST02.08",
+    "historia": "HU02",
+    "sprint": "Sprint 2",
+    "area": "Frontend",
+    "subtarea": "Pantalla del instructor para crear clases y cargar sus bloques de disponibilidad.",
+    "criterio": "El instructor completa el flujo completo sin ayuda; los errores de validación se muestran en el formulario."
+  },
+  {
+    "id": "ST02.09",
+    "historia": "HU02",
+    "sprint": "Sprint 2",
+    "area": "Frontend",
+    "subtarea": "Vista del coordinador de horarios por recinto, con capacidad de editar bloques de cualquier instructor.",
+    "criterio": "Los cambios hechos por el coordinador quedan registrados con usuario y fecha."
+  },
+  {
+    "id": "ST02.10",
+    "historia": "HU02",
+    "sprint": "Sprint 2",
+    "area": "Frontend",
+    "subtarea": "Definir y construir la vista «mis recintos y horarios» del cliente (propuesta: sus reservas próximas).",
+    "criterio": "Decisión registrada en el documento (ver pendientes) y pantalla que la muestra."
+  },
+  {
+    "id": "ST02.11",
+    "historia": "HU02",
+    "sprint": "Sprint 2",
+    "area": "Pruebas",
+    "subtarea": "Pruebas: crear recinto, bloque válido, bloque solapado rechazado y eliminación bloqueada con reservas.",
+    "criterio": "Los cuatro casos pasan en la suite automatizada."
+  },
+  {
+    "id": "ST03.01",
+    "historia": "HU03",
+    "sprint": "Sprint 3",
+    "area": "BD",
+    "subtarea": "Crear la tabla de reservas con estados pendiente, confirmada y cancelada, y fecha de creación.",
+    "criterio": "Estados restringidos a los tres valores permitidos por la base de datos."
+  },
+  {
+    "id": "ST03.02",
+    "historia": "HU03",
+    "sprint": "Sprint 3",
+    "area": "BD",
+    "subtarea": "Impedir reservas duplicadas sobre el mismo cupo y fecha con una restricción única.",
+    "criterio": "Insertar una segunda reserva activa para el mismo cupo falla a nivel de base de datos."
+  },
+  {
+    "id": "ST03.03",
+    "historia": "HU03",
+    "sprint": "Sprint 3",
+    "area": "Backend",
+    "subtarea": "Endpoint de consulta de disponibilidad por fecha, recinto y tipo de clase, que solo devuelve horarios sin reserva activa.",
+    "criterio": "La respuesta coincide con la base de datos en el momento de la consulta."
+  },
+  {
+    "id": "ST03.04",
+    "historia": "HU03",
+    "sprint": "Sprint 3",
+    "area": "Frontend",
+    "subtarea": "Pantalla de consulta de disponibilidad para el cliente, con calendario o lista y filtros.",
+    "criterio": "El cliente puede filtrar por fecha y recinto y ve solo horarios libres."
+  },
+  {
+    "id": "ST03.05",
+    "historia": "HU03",
+    "sprint": "Sprint 3",
+    "area": "Backend",
+    "subtarea": "Reservar un cupo dentro de una transacción que valide disponibilidad antes de guardar.",
+    "criterio": "Dos solicitudes simultáneas para el mismo horario: solo una queda guardada."
+  },
+  {
+    "id": "ST03.06",
+    "historia": "HU03",
+    "sprint": "Sprint 3",
+    "area": "Backend",
+    "subtarea": "Cancelar una reserva propia: pasa a cancelada, libera el cupo y conserva el registro.",
+    "criterio": "El cliente no puede cancelar reservas de otro usuario; el horario vuelve a aparecer libre."
+  },
+  {
+    "id": "ST03.07",
+    "historia": "HU03",
+    "sprint": "Sprint 3",
+    "area": "Frontend",
+    "subtarea": "Panel del coordinador con listado de reservas filtrable por fecha, recinto y estado.",
+    "criterio": "Las reservas se muestran con nombre del cliente, horario y estado correcto."
+  },
+  {
+    "id": "ST03.08",
+    "historia": "HU03",
+    "sprint": "Sprint 3",
+    "area": "Backend",
+    "subtarea": "Acciones del coordinador para confirmar o cancelar una reserva.",
+    "criterio": "Cada acción cambia el estado y deja registro de quién la hizo."
+  },
+  {
+    "id": "ST03.09",
+    "historia": "HU03",
+    "sprint": "Sprint 3",
+    "area": "Frontend",
+    "subtarea": "Vista del instructor con el conteo de reservas y de confirmadas por clase y horario.",
+    "criterio": "Los conteos se actualizan después de reservar, cancelar o confirmar."
+  },
+  {
+    "id": "ST03.10",
+    "historia": "HU03",
+    "sprint": "Sprint 3",
+    "area": "Backend",
+    "subtarea": "Extender el panel con permisos de administrador: ver todas las reservas, editar y reasignar.",
+    "criterio": "El administrador puede hacer las mismas acciones que el coordinador y además reasignar."
+  },
+  {
+    "id": "ST03.11",
+    "historia": "HU03",
+    "sprint": "Sprint 3",
+    "area": "Pruebas",
+    "subtarea": "Prueba E2E del flujo: reservar, confirmar, cancelar y verificar que el horario vuelve a estar libre.",
+    "criterio": "El flujo completo pasa en un entorno de prueba limpio."
+  },
+  {
+    "id": "ST04.01",
+    "historia": "HU04",
+    "sprint": "Sprint 4",
+    "area": "Backend",
+    "subtarea": "Configurar el servicio de envío de correo con credenciales en variables de entorno.",
+    "criterio": "Un correo de prueba llega a la bandeja de destino."
+  },
+  {
+    "id": "ST04.02",
+    "historia": "HU04",
+    "sprint": "Sprint 4",
+    "area": "Backend",
+    "subtarea": "Crear un proceso programado que, cada cierto intervalo, busque reservas pendientes que empiezan en una hora.",
+    "criterio": "El proceso encuentra las reservas correctas según la zona horaria del club."
+  },
+  {
+    "id": "ST04.03",
+    "historia": "HU04",
+    "sprint": "Sprint 4",
+    "area": "BD",
+    "subtarea": "Registrar en cada reserva si el recordatorio ya fue enviado, para no repetirlo.",
+    "criterio": "Una misma reserva recibe como máximo un recordatorio, aunque el proceso corra varias veces."
+  },
+  {
+    "id": "ST04.04",
+    "historia": "HU04",
+    "sprint": "Sprint 4",
+    "area": "Backend",
+    "subtarea": "Generar el enlace de confirmación con un token firmado, de un solo uso y con caducidad.",
+    "criterio": "Un enlace usado o vencido no confirma la reserva y muestra un mensaje claro."
+  },
+  {
+    "id": "ST04.05",
+    "historia": "HU04",
+    "sprint": "Sprint 4",
+    "area": "Frontend",
+    "subtarea": "Plantilla del correo de recordatorio con los datos de la reserva.",
+    "criterio": "El correo muestra recinto, fecha, hora y el botón de confirmar."
+  },
+  {
+    "id": "ST04.06",
+    "historia": "HU04",
+    "sprint": "Sprint 4",
+    "area": "Backend",
+    "subtarea": "Aviso al instructor con el número de confirmadas por clase (al cierre de la jornada o bajo demanda).",
+    "criterio": "El instructor recibe el conteo correcto para cada una de sus clases."
+  },
+  {
+    "id": "ST04.07",
+    "historia": "HU04",
+    "sprint": "Sprint 4",
+    "area": "Backend",
+    "subtarea": "Reporte de reservas para coordinador y administrador: filtros por fecha y recinto, exportable a CSV.",
+    "criterio": "El CSV coincide con el listado de la pantalla para los mismos filtros."
+  },
+  {
+    "id": "ST04.08",
+    "historia": "HU04",
+    "sprint": "Sprint 4",
+    "area": "Pruebas",
+    "subtarea": "Pruebas: el recordatorio se envía una sola vez, no se envía para reservas canceladas y el token vencido es rechazado.",
+    "criterio": "Los tres casos pasan en la suite automatizada."
+  },
+  {
+    "id": "ST05.01",
+    "historia": "HU05",
+    "sprint": "Sprint 4",
+    "area": "BD",
+    "subtarea": "Crear la tabla de sugerencias: usuario, recinto, clase (opcional), categoría, texto, fecha y estado (nueva o revisada).",
+    "criterio": "Migración aplicada; el texto tiene un límite de caracteres definido."
+  },
+  {
+    "id": "ST05.02",
+    "historia": "HU05",
+    "sprint": "Sprint 4",
+    "area": "Frontend",
+    "subtarea": "Barra o botón de sugerencias en la web, con formulario de categoría y texto.",
+    "criterio": "Un envío válido guarda la sugerencia y muestra confirmación al usuario."
+  },
+  {
+    "id": "ST05.03",
+    "historia": "HU05",
+    "sprint": "Sprint 4",
+    "area": "Backend",
+    "subtarea": "Endpoint para guardar sugerencias con validación de texto vacío y longitud máxima.",
+    "criterio": "Texto vacío o excesivo devuelve error 400."
+  },
+  {
+    "id": "ST05.04",
+    "historia": "HU05",
+    "sprint": "Sprint 4",
+    "area": "Frontend",
+    "subtarea": "Listado para el coordinador con filtros por recinto, categoría y estado, y acción para marcar como revisada.",
+    "criterio": "El coordinador puede ver todas las sugerencias y cambiar su estado."
+  },
+  {
+    "id": "ST05.05",
+    "historia": "HU05",
+    "sprint": "Sprint 4",
+    "area": "Backend",
+    "subtarea": "Indicadores para el administrador: conteo de sugerencias por recinto, clase y categoría, por periodo.",
+    "criterio": "Los totales coinciden con una consulta directa a la base de datos."
+  },
+  {
+    "id": "ST05.06",
+    "historia": "HU05",
+    "sprint": "Sprint 4",
+    "area": "Frontend",
+    "subtarea": "Panel de indicadores con tablas o gráficos simples.",
+    "criterio": "El panel carga en menos de dos segundos con datos de prueba."
+  },
+  {
+    "id": "ST05.07",
+    "historia": "HU05",
+    "sprint": "Sprint 4",
+    "area": "Pruebas",
+    "subtarea": "Pruebas: envío válido, envío vacío rechazado y conteo de indicadores correcto.",
+    "criterio": "Los tres casos pasan en la suite automatizada."
+  }
+]
