@@ -72,3 +72,17 @@ Antes de crear una rama o abrir un Pull Request, revisa la guía oficial en [CON
 - Nomenclatura de ramas (`feature/HU0X-descripcion`, `chore/TR0X-descripcion`).
 - Convención de mensajes de commit.
 - Uso obligatorio del ID de subtarea (`ST0X.0X` / `TR.0X.0X`) en cada Pull Request.
+
+
+## Levantamiento 
+
+## Backend
+
+```bash
+cd backend
+cp .env.example .env    # completar MONGODB_URI y JWT_SECRET
+npm install
+npm run dev
+```
+
+Comprobar en http://localhost:3000/api/health
