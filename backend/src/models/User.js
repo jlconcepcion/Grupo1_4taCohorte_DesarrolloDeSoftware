@@ -18,6 +18,11 @@ userSchema.pre('save', async function () {
   this.password = await bcrypt.hash(this.password, 10);
 });
 
+// Compara una contraseña en texto plano con el hash almacenado
+userSchema.methods.compararPassword = function (password) {
+  return bcrypt.compare(password, this.password);
+};
+
 // Nunca devolver la contraseña en las respuestas JSON
 userSchema.set('toJSON', {
   transform: (doc, ret) => {
