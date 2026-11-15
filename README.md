@@ -57,13 +57,87 @@ Aplicación web para la gestión integral de reservas de canchas deportivas y cl
    ```
 
 2. **Configurar variables de entorno:**
-   Copiar el archivo de ejemplo `.env.example` a `.env` (se incorpora en `TR.02`) y ajustar las credenciales locales.
+   Copiar el archivo de ejemplo `.env.example` a `.env` y ajustar el `JWT_SECRET`.
    > **Nota:** Nunca subir archivos `.env` al repositorio.
 
-3. **Ejecución del entorno de desarrollo:**
-   *(Se documentará el comando único de arranque al completar `TR.02`).*
+---
+
+## Levantamiento con Docker (recomendado)
+
+`TR.02` deja todo el entorno listo con un solo comando (MongoDB + backend + frontend):
+
+```bash
+cp .env.example .env       # PowerShell: Copy-Item .env.example .env
+docker compose up --build
+```
+
+Servicios:
+
+| Servicio | URL |
+|---|---|
+| Frontend (React + Nginx) | http://localhost:8080 |
+| API REST | http://localhost:3000/api/health |
+| MongoDB | `localhost:27017` |
+
+Cargar los usuarios de prueba (con los contenedores arriba):
+
+```bash
+docker compose exec backend npm run seed
+```
+
+Si un usuario de prueba ya existe, el seed **actualiza su rol, contraseña y estado activo**, por lo que también sirve para corregir cuentas creadas por error desde el formulario de registro.
+
+| Rol | Correo | Contraseña |
+|---|---|---|
+| Administrador | `admin@gym.com` | `Admin12345` |
+| Coordinador | `coordinador@gym.com` | `Coord12345` |
+| Instructor | `instructor@gym.com` | `Instructor12345` |
+| Cliente | `cliente@gym.com` | `Cliente12345` |
+
+Para detener el entorno: `docker compose down` (agregar `-v` para borrar los datos de MongoDB).
 
 ---
+
+## Levantamiento local sin Docker
+
+**Backend:**
+```bash
+cd backend
+cp .env.example .env        # completar MONGODB_URI y JWT_SECRET
+npm install
+npm run dev
+```
+
+Comprobar en http://localhost:3000/api/health
+
+**Frontend:**
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Disponible en http://localhost:5173 (Vite redirige `/api` al backend en el puerto 3000).
+
+---
+
+## Endpoints de autenticación (Sprint 1)
+
+| Método | Ruta | Descripción | Requiere token |
+|---|---|---|---|
+| `POST` | `/api/auth/registro` | Registro público de clientes | No |
+| `POST` | `/api/auth/login` | Inicio de sesión (JWT, 2 h por defecto) | No |
+| `GET` | `/api/auth/perfil` | Datos del usuario autenticado | Sí |
+| `POST` | `/api/usuarios` | Crear usuario/instructor (solo administrador) | Sí |
+
+---
+
+## Pruebas
+
+```bash
+cd backend && npm test          # Jest + Supertest (auth, roles, usuarios)
+cd frontend && npm run build    # verificación de compilación
+```
 
 ## Contribución y Flujo de Trabajo
 
@@ -72,17 +146,3 @@ Antes de crear una rama o abrir un Pull Request, revisa la guía oficial en [CON
 - Nomenclatura de ramas (`feature/HU0X-descripcion`, `chore/TR0X-descripcion`).
 - Convención de mensajes de commit.
 - Uso obligatorio del ID de subtarea (`ST0X.0X` / `TR.0X.0X`) en cada Pull Request.
-
-
-## Levantamiento 
-
-## Backend
-
-```bash
-cd backend
-cp .env.example .env    # completar MONGODB_URI y JWT_SECRET
-npm install
-npm run dev
-```
-
-Comprobar en http://localhost:3000/api/health
