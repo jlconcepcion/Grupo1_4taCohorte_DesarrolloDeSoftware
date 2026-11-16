@@ -79,6 +79,8 @@ Servicios:
 | API REST | http://localhost:3000/api/health |
 | MongoDB | `localhost:27017` |
 
+El frontend muestra una **landing pública de presentación** y, desde sus botones «Iniciar sesión» / «Crear cuenta», el flujo real de autenticación.
+
 Cargar los usuarios de prueba (con los contenedores arriba):
 
 ```bash
