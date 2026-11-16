@@ -85,6 +85,9 @@ docker compose up -d --build
 ### Cargar Datos de Prueba (Usuarios, Recintos, Clases y Bloques)
 
 Con los contenedores levantados, ejecuta:
+El frontend muestra una **landing pública de presentación** y, desde sus botones «Iniciar sesión» / «Crear cuenta», el flujo real de autenticación.
+
+Cargar los usuarios de prueba (con los contenedores arriba):
 
 ```bash
 docker compose exec backend npm run seed
