@@ -1,0 +1,159 @@
+/**
+ * Definición de esquemas ($jsonSchema) e índices de MongoDB para la base de datos
+ * "reservas_gimnasio" (TR.03), alineada con las Historias de Usuario HU01 a HU17
+ * y las Épicas 1 a 5.
+ */
+
+const MONGODB_SCHEMAS = {
+  users: {
+    validator: {
+      $jsonSchema: {
+        bsonType: 'object',
+        required: ['correo', 'password', 'rol', 'activo'],
+        properties: {
+          correo: { bsonType: 'string', pattern: '^\\S+@\\S+\\.\\S+$' },
+          password: { bsonType: 'string', minLength: 20 },
+          rol: {
+            bsonType: 'string',
+            enum: ['cliente', 'coordinador', 'instructor', 'administrador']
+          },
+          activo: { bsonType: 'bool' }
+        }
+      }
+    },
+    indexes: [
+      { key: { correo: 1 }, options: { unique: true, name: 'uk_users_correo' } }
+    ]
+  },
+
+  recintos: {
+    validator: {
+      $jsonSchema: {
+        bsonType: 'object',
+        required: ['nombre', 'tipo', 'capacidad', 'activo'],
+        properties: {
+          nombre: { bsonType: 'string', minLength: 2 },
+          tipo: { bsonType: 'string', minLength: 2 },
+          descripcion: { bsonType: 'string' },
+          capacidad: { bsonType: 'int', minimum: 1 },
+          activo: { bsonType: 'bool' }
+        }
+      }
+    },
+    indexes: [
+      { key: { nombre: 1 }, options: { unique: true, name: 'uk_recintos_nombre' } },
+      { key: { activo: 1, tipo: 1 }, options: { name: 'idx_recintos_activo_tipo' } }
+    ]
+  },
+
+  clases: {
+    validator: {
+      $jsonSchema: {
+        bsonType: 'object',
+        required: ['nombre', 'tipoRutina', 'instructor', 'recinto'],
+        properties: {
+          nombre: { bsonType: 'string', minLength: 2 },
+          tipoRutina: { bsonType: 'string', minLength: 2 },
+          instructor: { bsonType: 'objectId' },
+          recinto: { bsonType: 'objectId' },
+          activa: { bsonType: 'bool' }
+        }
+      }
+    },
+    indexes: [
+      { key: { instructor: 1, activa: 1 }, options: { name: 'idx_clases_instructor' } },
+      { key: { recinto: 1, activa: 1 }, options: { name: 'idx_clases_recinto' } }
+    ]
+  },
+
+  bloques: {
+    validator: {
+      $jsonSchema: {
+        bsonType: 'object',
+        required: ['clase', 'instructor', 'recinto', 'diaSemana', 'horaInicio', 'horaFin', 'capacidad'],
+        properties: {
+          clase: { bsonType: 'objectId' },
+          instructor: { bsonType: 'objectId' },
+          recinto: { bsonType: 'objectId' },
+          diaSemana: { bsonType: 'int', minimum: 0, maximum: 6 },
+          horaInicio: { bsonType: 'string', pattern: '^([01]\\d|2[0-3]):[0-5]\\d$' },
+          horaFin: { bsonType: 'string', pattern: '^([01]\\d|2[0-3]):[0-5]\\d$' },
+          capacidad: { bsonType: 'int', minimum: 1 },
+          modificadoPor: { bsonType: 'objectId' },
+          fechaModificacion: { bsonType: 'date' }
+        }
+      }
+    },
+    indexes: [
+      { key: { instructor: 1, diaSemana: 1 }, options: { name: 'idx_bloques_instructor_dia' } },
+      { key: { recinto: 1, diaSemana: 1 }, options: { name: 'idx_bloques_recinto_dia' } }
+    ]
+  },
+
+  reservas: {
+    validator: {
+      $jsonSchema: {
+        bsonType: 'object',
+        required: ['cliente', 'bloque', 'recinto', 'fecha', 'estado'],
+        properties: {
+          cliente: { bsonType: 'objectId' },
+          bloque: { bsonType: 'objectId' },
+          recinto: { bsonType: 'objectId' },
+          clase: { bsonType: 'objectId' },
+          fecha: { bsonType: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
+          estado: {
+            bsonType: 'string',
+            enum: ['pendiente', 'confirmada', 'cancelada']
+          },
+          gestionadoPor: { bsonType: 'objectId' },
+          fechaConfirmacion: { bsonType: 'date' },
+          fechaCancelacion: { bsonType: 'date' },
+          motivoCancelacion: { bsonType: 'string' },
+          recordatorioEnviado: { bsonType: 'bool' },
+          tokenConfirmacion: { bsonType: 'string' }
+        }
+      }
+    },
+    indexes: [
+      {
+        // HU11: No se permite duplicar una reserva activa del mismo cliente para el mismo bloque y fecha
+        key: { bloque: 1, fecha: 1, cliente: 1 },
+        options: {
+          unique: true,
+          name: 'uk_reservas_cliente_bloque_fecha_activa',
+          partialFilterExpression: {
+            estado: { $in: ['pendiente', 'confirmada'] }
+          }
+        }
+      },
+      { key: { bloque: 1, fecha: 1, estado: 1 }, options: { name: 'idx_reservas_ocupacion_bloque' } },
+      { key: { fecha: 1, recinto: 1, estado: 1 }, options: { name: 'idx_reservas_busqueda' } }
+    ]
+  },
+
+  sugerencias: {
+    validator: {
+      $jsonSchema: {
+        bsonType: 'object',
+        required: ['usuario', 'recinto', 'categoria', 'texto', 'estado'],
+        properties: {
+          usuario: { bsonType: 'objectId' },
+          recinto: { bsonType: 'objectId' },
+          clase: { bsonType: 'objectId' },
+          categoria: {
+            bsonType: 'string',
+            enum: ['instalaciones', 'instructor', 'horarios', 'limpieza', 'atencion', 'otro']
+          },
+          texto: { bsonType: 'string', minLength: 1, maxLength: 500 },
+          estado: { bsonType: 'string', enum: ['nueva', 'revisada'] },
+          revisadoPor: { bsonType: 'objectId' }
+        }
+      }
+    },
+    indexes: [
+      { key: { recinto: 1, categoria: 1, estado: 1 }, options: { name: 'idx_sugerencias_filtros' } }
+    ]
+  }
+};
+
+module.exports = { MONGODB_SCHEMAS };
