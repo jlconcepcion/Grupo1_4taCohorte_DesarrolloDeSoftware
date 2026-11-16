@@ -1,6 +1,19 @@
 const User = require('../models/User');
 const { ROLES } = require('../config/permisos');
 
+async function listarUsuarios(req, res) {
+  try {
+    const filtro = {};
+    if (req.query?.rol && ROLES.includes(req.query.rol)) {
+      filtro.rol = req.query.rol;
+    }
+    const usuarios = await User.find(filtro).sort({ createdAt: -1 });
+    return res.json(usuarios);
+  } catch (err) {
+    return res.status(500).json({ mensaje: 'Error al consultar los usuarios' });
+  }
+}
+
 async function crearUsuario(req, res) {
   const { correo, password, rol } = req.body || {};
 
@@ -23,4 +36,4 @@ async function crearUsuario(req, res) {
   }
 }
 
-module.exports = { crearUsuario };
+module.exports = { listarUsuarios, crearUsuario };

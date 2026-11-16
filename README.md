@@ -3,7 +3,7 @@
 **Proyecto Final · Metodologías Ágiles con Scrum**  
 **Grupo 1 · 4ta Cohorte de Desarrollo de Software**
 
-Aplicación web para la gestión integral de reservas de canchas deportivas y clases de gimnasio con instructores. Permite a los clientes consultar disponibilidad y reservar desde cualquier lugar, a los instructores administrar sus clases y bloques de horario, y a la coordinación/administración gestionar cupos, confirmaciones, reportes e indicadores de servicio.
+Aplicación web para la gestión integral de reservas de canchas deportivas y clases de gimnasio con instructores. Permite a los clientes consultar disponibilidad y reservar desde cualquier lugar, a los instructores administrar sus clases y bloques de horario, y a la coordinación/administración gestionar recintos, cupos, confirmaciones, reportes e indicadores de servicio.
 
 ---
 
@@ -11,16 +11,19 @@ Aplicación web para la gestión integral de reservas de canchas deportivas y cl
 
 ```text
 .
-├── .github/                  # Plantillas de Issues, Pull Requests y flujos de CI/CD
+├── .github/                  # Plantillas de Issues, Pull Requests y flujo de CI/CD (GitHub Actions)
 │   ├── ISSUE_TEMPLATE/       # Plantillas para subtareas (ST0X.0X / TR.0X) y errores
+│   ├── workflows/ci.yml      # Pipeline de Integración Continua (TR.04)
 │   └── pull_request_template.md
-├── backend/                  # API REST, lógica de negocio, autenticación y middlewares RBAC
-├── frontend/                 # Interfaz web responsiva para clientes y paneles administrativos
-├── database/                 # Esquema de datos y datos iniciales
-│   ├── migrations/           # Migraciones versionadas de la base de datos
-│   └── seeds/                # Datos semilla para desarrollo y pruebas
-├── tests/                    # Pruebas automatizadas (unitarias, integración y E2E)
-├── docs/                     # Documentación del proyecto, modelo E-R y especificaciones
+├── backend/                  # API REST (Node.js + Express 5 + Mongoose 9 + JWT + Jest/Supertest)
+├── frontend/                 # Aplicación web (React 18 + Vite 6 + Tailwind CSS v4 + Nginx)
+├── database/                 # Esquemas ($jsonSchema) e índices de MongoDB
+│   ├── migrations/           # Validadores e índices de colecciones MongoDB (TR.03)
+│   └── seeds/                # Datos semilla (integrados también en backend/src/scripts/seed.js)
+├── tests/                    # Documentación y referencia de suites de pruebas automatizadas
+├── docs/                     # Documentación del proyecto, Modelo E-R (TR.03) y Matriz RBAC (ST01.05)
+├── docker-compose.yml        # Orquestación de contenedores: mongo:7, backend (:3000) y frontend (:8080)
+├── .env.example              # Plantilla de variables de entorno
 ├── .gitignore                # Exclusión de dependencias, builds, .env y archivos locales
 ├── CONTRIBUTING.md           # Guía de contribución, flujo de ramas y convención de commits
 └── README.md                 # Documentación general del repositorio
@@ -32,19 +35,19 @@ Aplicación web para la gestión integral de reservas de canchas deportivas y cl
 
 | Rol | Responsabilidades principales |
 | :--- | :--- |
-| **Cliente** | Consulta disponibilidad de recintos e instructores, reserva/cancela su cupo, confirma asistencia y envía quejas o sugerencias. |
-| **Instructor** | Crea clases en recintos activos, publica bloques de disponibilidad y consulta el conteo de reservas y confirmaciones. |
-| **Coordinador** | Visualiza recintos y reservas, confirma o cancela reservas pendientes para liberar cupos, administra horarios por recinto y revisa sugerencias. |
-| **Administrador** | Gestiona usuarios, instructores y recintos, administra y reasigna reservas, exporta reportes CSV y consulta indicadores de desempeño. |
+| **Cliente** | Se registra, consulta disponibilidad de recintos activos e instructores, reserva/cancela su cupo, confirma asistencia y envía quejas o sugerencias. |
+| **Instructor** | Crea y edita sus propias clases en recintos activos, publica y actualiza bloques de disponibilidad sin solapamientos y consulta el conteo de reservas. |
+| **Coordinador** | Visualiza y edita bloques de horarios de cualquier instructor por recinto (con registro de auditoría), confirma o cancela reservas pendientes, revisa sugerencias y descarga reportes. |
+| **Administrador** | Crea usuarios e instructores con rol, crea/edita/desactiva recintos conservando su historial, gestiona horarios y reservas, exporta reportes CSV y consulta indicadores. |
 
 ---
 
-## Plan de Sprints y Épicas
+## Plan y Estado de Sprints
 
-- **Sprint 1:** Tareas transversales (`TR.01` – `TR.04`) y **Épica 1 · Autenticación y usuarios (`HU01`)**.
-- **Sprint 2:** **Épica 2 · Gestión de recintos y horarios (`HU02`)**.
-- **Sprint 3:** **Épica 3 · Reservas (`HU03`)**.
-- **Sprint 4:** **Épica 4 · Notificaciones (`HU04`)** y **Épica 5 · Sugerencias de los clientes (`HU05`)**.
+- **Sprint 1 (Completado):** Tareas transversales (`TR.01` – `TR.04`) y **Épica 1 · Autenticación y usuarios (`HU01` – `HU03` / `ST01.01` – `ST01.08`)**.
+- **Sprint 2 (Completado):** **Épica 2 · Gestión de recintos y horarios (`HU04` – `HU09` / `ST02.01` – `ST02.11`)**.
+- **Sprint 3:** **Épica 3 · Reservas (`HU10` – `HU17` / `ST03.01` – `ST03.11`)**.
+- **Sprint 4:** **Épica 4 · Notificaciones** y **Épica 5 · Sugerencias de los clientes**.
 
 ---
 
@@ -62,45 +65,45 @@ Aplicación web para la gestión integral de reservas de canchas deportivas y cl
 
 ---
 
-## Levantamiento con Docker (recomendado)
+## Levantamiento con Docker (Recomendado · `TR.02`)
 
-`TR.02` deja todo el entorno listo con un solo comando (MongoDB + backend + frontend):
+Levanta todo el entorno (`mongo:7`, `backend` y `frontend`) con un solo comando:
 
 ```bash
 cp .env.example .env       # PowerShell: Copy-Item .env.example .env
-docker compose up --build
+docker compose up -d --build
 ```
 
-Servicios:
+### Servicios Activos
 
-| Servicio | URL |
-|---|---|
-| Frontend (React + Nginx) | http://localhost:8080 |
-| API REST | http://localhost:3000/api/health |
-| MongoDB | `localhost:27017` |
+| Servicio | URL | Descripción |
+| :--- | :--- | :--- |
+| **Frontend (React + Vite + Nginx)** | http://localhost:8080 | Landing pública, Login, Registro y Panel por rol |
+| **API REST (Express + Mongoose)** | http://localhost:3000/api/health | Backend API REST conectada a MongoDB |
+| **MongoDB 7** | `localhost:27017` | Base de datos `reservas_gimnasio` |
 
-El frontend muestra una **landing pública de presentación** y, desde sus botones «Iniciar sesión» / «Crear cuenta», el flujo real de autenticación.
+### Cargar Datos de Prueba (Usuarios, Recintos, Clases y Bloques)
 
-Cargar los usuarios de prueba (con los contenedores arriba):
+Con los contenedores levantados, ejecuta:
 
 ```bash
 docker compose exec backend npm run seed
 ```
 
-Si un usuario de prueba ya existe, el seed **actualiza su rol, contraseña y estado activo**, por lo que también sirve para corregir cuentas creadas por error desde el formulario de registro.
+El seed crea o actualiza los 4 usuarios de prueba y registra además 3 recintos iniciales (*Cancha 1*, *Sala Funcional Principal* y *Sala de Spinning*), 2 clases y 2 bloques de disponibilidad:
 
 | Rol | Correo | Contraseña |
-|---|---|---|
-| Administrador | `admin@gym.com` | `Admin12345` |
-| Coordinador | `coordinador@gym.com` | `Coord12345` |
-| Instructor | `instructor@gym.com` | `Instructor12345` |
-| Cliente | `cliente@gym.com` | `Cliente12345` |
+| :--- | :--- | :--- |
+| **Administrador** | `admin@gym.com` | `Admin12345` |
+| **Coordinador** | `coordinador@gym.com` | `Coord12345` |
+| **Instructor** | `instructor@gym.com` | `Instructor12345` |
+| **Cliente** | `cliente@gym.com` | `Cliente12345` |
 
 Para detener el entorno: `docker compose down` (agregar `-v` para borrar los datos de MongoDB).
 
 ---
 
-## Levantamiento local sin Docker
+## Levantamiento Local sin Docker
 
 **Backend:**
 ```bash
@@ -110,41 +113,46 @@ npm install
 npm run dev
 ```
 
-Comprobar en http://localhost:3000/api/health
-
 **Frontend:**
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
-
-Disponible en http://localhost:5173 (Vite redirige `/api` al backend en el puerto 3000).
-
----
-
-## Endpoints de autenticación (Sprint 1)
-
-| Método | Ruta | Descripción | Requiere token |
-|---|---|---|---|
-| `POST` | `/api/auth/registro` | Registro público de clientes | No |
-| `POST` | `/api/auth/login` | Inicio de sesión (JWT, 2 h por defecto) | No |
-| `GET` | `/api/auth/perfil` | Datos del usuario autenticado | Sí |
-| `POST` | `/api/usuarios` | Crear usuario/instructor (solo administrador) | Sí |
+Disponible en http://localhost:5173 (Vite redirige `/api` al backend en el puerto `3000`).
 
 ---
 
-## Pruebas
+## Endpoints de la API REST (Sprints 1 y 2)
+
+| Método | Ruta | Descripción | Roles autorizados |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/health` | Verificación de estado del servidor | Público |
+| `POST` | `/api/auth/registro` | Registro público de clientes (`HU01`) | Público |
+| `POST` | `/api/auth/login` | Inicio de sesión con JWT (`HU02`) | Público |
+| `GET` | `/api/auth/perfil` | Perfil del usuario autenticado (`HU02`) | Todos los roles autenticados |
+| `GET` | `/api/usuarios` | Listado de usuarios registrados (`HU03`) | `administrador` |
+| `POST` | `/api/usuarios` | Crear usuario o instructor con rol (`HU03`) | `administrador` |
+| `GET` | `/api/recintos` | Listar recintos (clientes solo ven activos) (`HU04`, `HU05`) | Todos los roles autenticados |
+| `POST` | `/api/recintos` | Crear nuevo recinto activo (`HU04`) | `administrador` |
+| `PUT / PATCH` | `/api/recintos/:id` | Actualizar datos o activar/desactivar recinto (`HU05`) | `administrador` |
+| `GET` | `/api/clases` | Consultar clases (`?propias=true`, `?recinto=...`) (`HU06`) | Todos los roles autenticados |
+| `POST` | `/api/clases` | Crear clase en recinto activo (`HU06`) | `instructor` |
+| `PUT / PATCH` | `/api/clases/:id` | Actualizar clase propia (`HU06`) | `instructor` (propietario) |
+| `GET` | `/api/bloques` | Consultar bloques de disponibilidad por recinto/día (`HU07`–`HU09`) | Todos los roles autenticados |
+| `POST` | `/api/bloques` | Registrar bloque propio validando no solapamiento (`HU07`) | `instructor` |
+| `PUT / PATCH` | `/api/bloques/:id` | Editar bloque propio (`HU08`) o de cualquier instructor con auditoría (`HU09`) | `instructor` (propio), `coordinador`, `administrador` |
+| `DELETE` | `/api/bloques/:id` | Eliminar bloque sin reservas activas (`ST02.07`, `HU09`) | `instructor` (propio), `coordinador`, `administrador` |
+
+---
+
+## Pruebas Automatizadas y Documentación
 
 ```bash
-cd backend && npm test          # Jest + Supertest (auth, roles, usuarios)
-cd frontend && npm run build    # verificación de compilación
+cd backend && npm test -- --runInBand   # 6 suites / 45 pruebas en Jest + Supertest (Sprints 1 y 2)
+cd frontend && npm run build            # Verificación de compilación de React + Vite
 ```
 
-## Contribución y Flujo de Trabajo
-
-Antes de crear una rama o abrir un Pull Request, revisa la guía oficial en [CONTRIBUTING.md](./CONTRIBUTING.md), donde se detallan:
-- Protección de la rama `main`.
-- Nomenclatura de ramas (`feature/HU0X-descripcion`, `chore/TR0X-descripcion`).
-- Convención de mensajes de commit.
-- Uso obligatorio del ID de subtarea (`ST0X.0X` / `TR.0X.0X`) en cada Pull Request.
+- **Modelo Entidad-Relación (`TR.03`):** [docs/modelo_entidad_relacion.md](./docs/modelo_entidad_relacion.md)
+- **Matriz de Permisos por Rol (`ST01.05`):** [docs/permisos.md](./docs/permisos.md)
+- **Guía de Contribución (`TR.01.06`):** [CONTRIBUTING.md](./CONTRIBUTING.md)

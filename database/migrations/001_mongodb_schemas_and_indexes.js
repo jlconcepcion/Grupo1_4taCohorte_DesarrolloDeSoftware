@@ -1,6 +1,7 @@
 /**
  * Definición de esquemas ($jsonSchema) e índices de MongoDB para la base de datos
- * "reservas_gimnasio" (TR.03), alineada con los modelos Mongoose del backend (HU01 a HU05).
+ * "reservas_gimnasio" (TR.03), alineada con las Historias de Usuario HU01 a HU17
+ * y las Épicas 1 a 5.
  */
 
 const MONGODB_SCHEMAS = {
@@ -29,10 +30,10 @@ const MONGODB_SCHEMAS = {
     validator: {
       $jsonSchema: {
         bsonType: 'object',
-        required: ['nombre', 'tipo', 'activo'],
+        required: ['nombre', 'tipo', 'capacidad', 'activo'],
         properties: {
           nombre: { bsonType: 'string', minLength: 2 },
-          tipo: { bsonType: 'string', enum: ['cancha', 'gimnasio'] },
+          tipo: { bsonType: 'string', minLength: 2 },
           descripcion: { bsonType: 'string' },
           capacidad: { bsonType: 'int', minimum: 1 },
           activo: { bsonType: 'bool' }
@@ -55,7 +56,6 @@ const MONGODB_SCHEMAS = {
           tipoRutina: { bsonType: 'string', minLength: 2 },
           instructor: { bsonType: 'objectId' },
           recinto: { bsonType: 'objectId' },
-          cupoMaximo: { bsonType: 'int', minimum: 1 },
           activa: { bsonType: 'bool' }
         }
       }
@@ -70,15 +70,17 @@ const MONGODB_SCHEMAS = {
     validator: {
       $jsonSchema: {
         bsonType: 'object',
-        required: ['instructor', 'recinto', 'diaSemana', 'horaInicio', 'horaFin'],
+        required: ['clase', 'instructor', 'recinto', 'diaSemana', 'horaInicio', 'horaFin', 'capacidad'],
         properties: {
+          clase: { bsonType: 'objectId' },
           instructor: { bsonType: 'objectId' },
           recinto: { bsonType: 'objectId' },
-          clase: { bsonType: 'objectId' },
           diaSemana: { bsonType: 'int', minimum: 0, maximum: 6 },
           horaInicio: { bsonType: 'string', pattern: '^([01]\\d|2[0-3]):[0-5]\\d$' },
           horaFin: { bsonType: 'string', pattern: '^([01]\\d|2[0-3]):[0-5]\\d$' },
-          modificadoPor: { bsonType: 'objectId' }
+          capacidad: { bsonType: 'int', minimum: 1 },
+          modificadoPor: { bsonType: 'objectId' },
+          fechaModificacion: { bsonType: 'date' }
         }
       }
     },
@@ -99,29 +101,32 @@ const MONGODB_SCHEMAS = {
           recinto: { bsonType: 'objectId' },
           clase: { bsonType: 'objectId' },
           fecha: { bsonType: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
-          cupoNumero: { bsonType: 'int', minimum: 1 },
           estado: {
             bsonType: 'string',
             enum: ['pendiente', 'confirmada', 'cancelada']
           },
+          gestionadoPor: { bsonType: 'objectId' },
+          fechaConfirmacion: { bsonType: 'date' },
+          fechaCancelacion: { bsonType: 'date' },
+          motivoCancelacion: { bsonType: 'string' },
           recordatorioEnviado: { bsonType: 'bool' },
-          tokenConfirmacion: { bsonType: 'string' },
-          gestionadoPor: { bsonType: 'objectId' }
+          tokenConfirmacion: { bsonType: 'string' }
         }
       }
     },
     indexes: [
       {
-        // ST03.02: Impedir reservas duplicadas sobre el mismo cupo y fecha
-        key: { bloque: 1, fecha: 1, cupoNumero: 1 },
+        // HU11: No se permite duplicar una reserva activa del mismo cliente para el mismo bloque y fecha
+        key: { bloque: 1, fecha: 1, cliente: 1 },
         options: {
           unique: true,
-          name: 'uk_reservas_bloque_fecha_cupo_activo',
+          name: 'uk_reservas_cliente_bloque_fecha_activa',
           partialFilterExpression: {
             estado: { $in: ['pendiente', 'confirmada'] }
           }
         }
       },
+      { key: { bloque: 1, fecha: 1, estado: 1 }, options: { name: 'idx_reservas_ocupacion_bloque' } },
       { key: { fecha: 1, recinto: 1, estado: 1 }, options: { name: 'idx_reservas_busqueda' } }
     ]
   },

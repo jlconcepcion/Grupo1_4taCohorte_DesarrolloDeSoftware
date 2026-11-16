@@ -54,3 +54,65 @@ export const auth = {
     }),
   perfil: () => peticion('/auth/perfil'),
 };
+
+export const usuariosApi = {
+  listar: (rol = '') => peticion(`/usuarios${rol ? `?rol=${encodeURIComponent(rol)}` : ''}`),
+  crear: (datos) =>
+    peticion('/usuarios', {
+      method: 'POST',
+      body: JSON.stringify(datos),
+    }),
+};
+
+export const recintosApi = {
+  listar: (soloActivos = false) =>
+    peticion(`/recintos${soloActivos ? '?soloActivos=true' : ''}`),
+  crear: (datos) =>
+    peticion('/recintos', {
+      method: 'POST',
+      body: JSON.stringify(datos),
+    }),
+  actualizar: (id, datos) =>
+    peticion(`/recintos/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(datos),
+    }),
+};
+
+export const clasesApi = {
+  listar: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return peticion(`/clases${qs ? `?${qs}` : ''}`);
+  },
+  crear: (datos) =>
+    peticion('/clases', {
+      method: 'POST',
+      body: JSON.stringify(datos),
+    }),
+  actualizar: (id, datos) =>
+    peticion(`/clases/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(datos),
+    }),
+};
+
+export const bloquesApi = {
+  listar: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return peticion(`/bloques${qs ? `?${qs}` : ''}`);
+  },
+  crear: (datos) =>
+    peticion('/bloques', {
+      method: 'POST',
+      body: JSON.stringify(datos),
+    }),
+  actualizar: (id, datos) =>
+    peticion(`/bloques/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(datos),
+    }),
+  eliminar: (id) =>
+    peticion(`/bloques/${id}`, {
+      method: 'DELETE',
+    }),
+};

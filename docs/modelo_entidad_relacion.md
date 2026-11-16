@@ -1,7 +1,7 @@
 # Modelo Entidad-Relación y Arquitectura de Datos (`TR.03`)
 
 **Proyecto:** Sistema de Reserva para Gimnasio y Canchas  
-**Subtarea:** `TR.03` · Diseñar el modelo entidad-relación completo (`usuarios`, `roles`, `recintos`, `clases`, `bloques_disponibilidad`, `reservas`, `sugerencias`).  
+**Subtarea:** `TR.03` · Diseñar el modelo entidad-relación completo (`usuarios`, `roles`, `recintos`, `clases`, `bloques_disponibilidad`, `reservas`, `sugerencias`), revisado contra las Historias de Usuario **`HU01` a `HU17`** y las Épicas 1 a 5.  
 **Stack Oficial del Proyecto:**
 - **Frontend (`frontend/`):** React 18 + Vite 6 + Tailwind CSS v4 (Nginx en puerto `8080` / Vite en `5173`).
 - **Backend (`backend/`):** Node.js + Express 5 + Mongoose 9 + JWT + `bcryptjs` (API REST en puerto `3000`).
@@ -30,7 +30,7 @@ flowchart TB
 
 ## 2. Diagrama Entidad-Relación de Modelos Mongoose / MongoDB (`TR.03`)
 
-El modelo de datos cubre íntegramente las historias de usuario **`HU01` a `HU05`** mediante colecciones en MongoDB (`reservas_gimnasio`) con referencias `ObjectId` y validaciones tanto en Mongoose como a nivel de índices de base de datos:
+El modelo de datos cubre íntegramente las historias **`HU01` a `HU17`** (Épicas 1 a 3) más las Épicas 4 y 5 mediante colecciones en MongoDB (`reservas_gimnasio`):
 
 ```mermaid
 erDiagram
@@ -40,7 +40,7 @@ erDiagram
     USERS ||--o{ BLOQUES_DISPONIBILIDAD : "instructor (ObjectId)"
     USERS |o--o{ BLOQUES_DISPONIBILIDAD : "modificadoPor (ObjectId)"
     RECINTOS ||--o{ BLOQUES_DISPONIBILIDAD : "recinto (ObjectId)"
-    CLASES |o--o{ BLOQUES_DISPONIBILIDAD : "clase (ObjectId)"
+    CLASES ||--o{ BLOQUES_DISPONIBILIDAD : "clase (ObjectId)"
     USERS ||--o{ RESERVAS : "cliente (ObjectId)"
     USERS |o--o{ RESERVAS : "gestionadoPor (ObjectId)"
     BLOQUES_DISPONIBILIDAD ||--o{ RESERVAS : "bloque (ObjectId)"
@@ -58,32 +58,30 @@ erDiagram
 
     USERS {
         ObjectId _id PK
-        string correo UK "required, unique, lowercase, trim (ST01.01)"
-        string password "Hash bcryptjs (pre-save hook, oculto en toJSON) (ST01.02)"
-        string rol "enum: cliente | coordinador | instructor | administrador (ST01.01, ST01.05)"
-        boolean activo "default: true (ST01.01)"
-        Date createdAt "timestamps: true (ST01.01)"
+        string correo UK "required, unique, lowercase, trim (HU01, HU03)"
+        string password "Hash bcryptjs (pre-save hook, oculto en toJSON) (HU01)"
+        string rol "enum: cliente | coordinador | instructor | administrador (HU01-HU03)"
+        boolean activo "default: true (HU01, HU02)"
+        Date createdAt "timestamps: true"
         Date updatedAt "timestamps: true"
     }
 
     RECINTOS {
         ObjectId _id PK
-        string nombre UK "required, unique, trim (ST02.02)"
-        string tipo "enum: cancha | gimnasio (ST02.02)"
-        string descripcion "Detalle opcional del recinto"
-        number capacidad "default: 1, min: 1"
-        boolean activo "default: true (desactivación sin perder historial - ST02.02)"
+        string nombre UK "required, unique, trim (HU04)"
+        string tipo "required, trim (cancha, sala, gimnasio - HU04)"
+        number capacidad "required, min: 1 (HU04, HU05)"
+        boolean activo "default: true (desactivación sin perder historial - HU04, HU05)"
         Date createdAt "timestamps: true"
         Date updatedAt "timestamps: true"
     }
 
     CLASES {
         ObjectId _id PK
-        string nombre "required, trim (ST02.04)"
-        string tipoRutina "required, trim (ST02.04)"
-        ObjectId instructor FK "ref: User, required (ST02.01, ST02.04)"
-        ObjectId recinto FK "ref: Recinto, required (solo recintos activos - ST02.01, ST02.04)"
-        number cupoMaximo "default: 15, min: 1"
+        string nombre "required, trim (HU06)"
+        string tipoRutina "required, trim (HU06)"
+        ObjectId instructor FK "ref: User, required (HU06)"
+        ObjectId recinto FK "ref: Recinto, required (solo recintos activos - HU05, HU06)"
         boolean activa "default: true"
         Date createdAt "timestamps: true"
         Date updatedAt "timestamps: true"
@@ -91,97 +89,96 @@ erDiagram
 
     BLOQUES_DISPONIBILIDAD {
         ObjectId _id PK
-        ObjectId instructor FK "ref: User, required (ST02.01)"
-        ObjectId recinto FK "ref: Recinto, required (ST02.01)"
-        ObjectId clase FK "ref: Clase, opcional"
-        number diaSemana "0=Dom .. 6=Sab, required (ST02.05)"
-        string horaInicio "HH:MM (24h), required (ST02.05)"
-        string horaFin "HH:MM (24h), required, > horaInicio (ST02.05)"
-        ObjectId modificadoPor FK "ref: User (auditoría coordinador - ST02.09)"
+        ObjectId clase FK "ref: Clase, required (HU07)"
+        ObjectId instructor FK "ref: User, required (HU07)"
+        ObjectId recinto FK "ref: Recinto, required (HU07)"
+        number diaSemana "0=Dom .. 6=Sab, required (HU07, HU08)"
+        string horaInicio "HH:MM (24h), required (HU07, HU08)"
+        string horaFin "HH:MM (24h), required, > horaInicio (HU07, HU08)"
+        number capacidad "required, min: 1 (no menor a reservas activas - HU07, HU08)"
+        ObjectId modificadoPor FK "ref: User (auditoría coordinador/admin - HU08, HU09)"
+        Date fechaModificacion "Fecha del último cambio auditado (HU09)"
         Date createdAt "timestamps: true"
-        Date updatedAt "timestamps: true (fecha de cambio - ST02.09)"
+        Date updatedAt "timestamps: true"
     }
 
     RESERVAS {
         ObjectId _id PK
-        ObjectId cliente FK "ref: User, required (ST03.01)"
-        ObjectId bloque FK "ref: BloqueDisponibilidad, required (ST03.01)"
-        ObjectId recinto FK "ref: Recinto, required"
-        ObjectId clase FK "ref: Clase, opcional"
-        string fecha "YYYY-MM-DD, required (ST03.02)"
-        number cupoNumero "default: 1, min: 1 (ST03.02)"
-        string estado "enum: pendiente | confirmada | cancelada (ST03.01)"
-        boolean recordatorioEnviado "default: false (ST04.03)"
-        string tokenConfirmacion "Token firmado de un solo uso (ST04.04)"
-        Date tokenExpiraEn "Caducidad del enlace (ST04.04)"
-        Date tokenUsadoEn "Marca de uso único (ST04.04)"
-        ObjectId gestionadoPor FK "ref: User (coordinador/admin - ST03.08, ST03.10)"
-        Date fechaGestion "Fecha de confirmación/cancelación (ST03.08)"
-        Date createdAt "timestamps: true (ST03.01)"
+        ObjectId cliente FK "ref: User, required (HU11)"
+        ObjectId bloque FK "ref: BloqueDisponibilidad, required (HU11)"
+        ObjectId recinto FK "ref: Recinto, required (HU10, HU15)"
+        ObjectId clase FK "ref: Clase, opcional (HU10, HU15)"
+        string fecha "YYYY-MM-DD, required (HU10, HU11)"
+        string estado "enum: pendiente | confirmada | cancelada (HU11, HU12, HU14, HU16, HU17)"
+        ObjectId gestionadoPor FK "ref: User (quién confirmó o canceló - HU16, HU17)"
+        Date fechaConfirmacion "Fecha/hora de confirmación (HU14, HU16)"
+        Date fechaCancelacion "Fecha/hora de cancelación (HU12, HU17)"
+        string motivoCancelacion "Motivo opcional al cancelar (HU17)"
+        boolean recordatorioEnviado "default: false (Épica 4)"
+        string tokenConfirmacion "Token firmado de un solo uso (Épica 4)"
+        Date tokenExpiraEn "Caducidad del enlace (Épica 4)"
+        Date tokenUsadoEn "Marca de uso único (Épica 4)"
+        Date createdAt "timestamps: true"
         Date updatedAt "timestamps: true"
     }
 
     SUGERENCIAS {
         ObjectId _id PK
-        ObjectId usuario FK "ref: User, required (ST05.01)"
-        ObjectId recinto FK "ref: Recinto, required (ST05.01)"
-        ObjectId clase FK "ref: Clase, opcional (ST05.01)"
+        ObjectId usuario FK "ref: User, required (Épica 5)"
+        ObjectId recinto FK "ref: Recinto, required (Épica 5)"
+        ObjectId clase FK "ref: Clase, opcional (Épica 5)"
         string categoria "enum: instalaciones | instructor | horarios | limpieza | atencion | otro"
-        string texto "required, trim, minlength: 1, maxlength: 500 (ST05.01, ST05.03)"
-        string estado "enum: nueva | revisada, default: nueva (ST05.01, ST05.04)"
-        ObjectId revisadoPor FK "ref: User, opcional (ST05.04)"
-        Date createdAt "timestamps: true (ST05.01)"
+        string texto "required, trim, minlength: 1, maxlength: 500 (Épica 5)"
+        string estado "enum: nueva | revisada, default: nueva (Épica 5)"
+        ObjectId revisadoPor FK "ref: User, opcional (Épica 5)"
+        Date createdAt "timestamps: true"
         Date updatedAt "timestamps: true"
     }
 ```
 
 ---
 
-## 3. Reglas de Integridad y Restricciones por Historia (`HU01` – `HU05`)
+## 3. Reglas de Integridad y Restricciones por Historia (`HU01` – `HU17`)
 
-### 3.1. Épica 1 · Autenticación y Usuarios (`HU01`)
+### 3.1. Épica 1 · Autenticación y Usuarios (`HU01` – `HU03` · Sprint 1)
 - **Modelo implementado:** [backend/src/models/User.js](../backend/src/models/User.js) y matriz RBAC en [backend/src/config/permisos.js](../backend/src/config/permisos.js).
-- **`ST01.01`:** Correo único (`unique: true, lowercase: true, trim: true`), rol restringido a `['cliente', 'coordinador', 'instructor', 'administrador']`, estado `activo: Boolean` y fechas automáticas (`timestamps: true`).
-- **`ST01.02`:** Cifrado con `bcryptjs` en hook `pre('save')` y eliminación automática de `password` en `toJSON`.
+- **`HU01` (Registro de cliente):** Correo único (`unique: true` -> `409` en duplicado), contraseña `>= 8` caracteres cifrada con `bcryptjs` en hook `pre('save')` y oculta en `toJSON`, cuenta creada activa con `rol: 'cliente'` y respuesta `201` con `{ usuario, token }`.
+- **`HU02` (Inicio de sesión):** Valida cuenta activa y contraseña (`401` con mensaje genérico si falla), emite JWT con caducidad configurable (`JWT_EXPIRES_IN`, `2h` por defecto) y recupera sesión en React (`GET /api/auth/perfil`).
+- **`HU03` (Creación de usuarios e instructores por administrador):** Ruta `POST /api/usuarios` exclusiva para `administrador` (`403` para otros roles), valida rol dentro de `['cliente', 'coordinador', 'instructor', 'administrador']` (`400` con opciones permitidas si es inválido) y rechaza correos duplicados con `409`.
 
-### 3.2. Épica 2 · Gestión de Recintos y Horarios (`HU02`)
-- **`ST02.01`:** `BloqueDisponibilidad` exige referencias obligatorias `instructor` (`ref: 'User'`, `required: true`) y `recinto` (`ref: 'Recinto'`, `required: true`).
-- **`ST02.02`:** `Recinto` utiliza borrado lógico (`activo: Boolean, default: true`) para que al desactivarse deje de aparecer en consultas de clientes sin perder el historial de reservas ni sugerencias.
-- **`ST02.05` y `ST02.06`:** Validación de `horaFin > horaInicio` y verificación en controlador/modelo para impedir que un mismo `instructor` registre bloques que se solapen en el mismo `diaSemana`.
-- **`ST02.07`:** Antes de eliminar un `BloqueDisponibilidad`, se verifica en `Reserva` que no existan reservas con `estado: { $in: ['pendiente', 'confirmada'] }`.
-- **`ST02.09`:** `modificadoPor` (`ref: 'User'`) y `updatedAt` registran los cambios realizados por el coordinador.
+### 3.2. Épica 2 · Gestión de Recintos y Horarios (`HU04` – `HU09` · Sprint 2)
+- **`HU04` y `HU05` (`Recinto`):** Nombre único (`409` si se repite), `tipo` y `capacidad > 0` obligatorios. Soporta desactivación (`activo: false`) para excluir el recinto de nuevas clases y consultas de disponibilidad mientras conserva el historial de clases y reservas.
+- **`HU06` (`Clase`):** Vinculada al instructor autenticado (`instructor`) y a un recinto activo (`recinto`).
+- **`HU07`, `HU08` y `HU09` (`BloqueDisponibilidad`):**
+  - Vinculado a `clase`, `instructor` y `recinto`, con `diaSemana`, `horaInicio`, `horaFin` (`horaFin > horaInicio`) y `capacidad > 0`.
+  - Validación de no solapamiento para el mismo `instructor` y `diaSemana`.
+  - En actualizaciones (`HU08`, `HU09`), no se permite reducir `capacidad` por debajo del número de reservas activas ni eliminar bloques con reservas activas, registrando `modificadoPor` y `fechaModificacion` (`updatedAt`).
 
-### 3.3. Épica 3 · Reservas (`HU03`)
-- **`ST03.01`:** Campo `estado` restringido por `enum: ['pendiente', 'confirmada', 'cancelada']` con valor inicial `'pendiente'`.
-- **`ST03.02` (Restricción única contra reservas duplicadas):**
-  Índice único parcial en MongoDB/Mongoose sobre reservas activas:
-  ```javascript
-  reservaSchema.index(
-    { bloque: 1, fecha: 1, cupoNumero: 1 },
-    {
-      unique: true,
-      partialFilterExpression: { estado: { $in: ['pendiente', 'confirmada'] } }
-    }
-  );
-  ```
-  Esto rechaza a nivel de base de datos (`code: 11000`) cualquier intento de duplicar una reserva activa sobre el mismo cupo y fecha, pero permite volver a reservar ese horario si la reserva previa pasa a `'cancelada'` (`ST03.06`).
-
-### 3.4. Épica 4 · Notificaciones y Reportes (`HU04`)
-- **`ST04.03`:** Booleano `recordatorioEnviado: { type: Boolean, default: false }` en `Reserva` para garantizar que el job programado (`ST04.02`) envíe como máximo un recordatorio por reserva.
-- **`ST04.04`:** Campos `tokenConfirmacion`, `tokenExpiraEn` y `tokenUsadoEn` para validar enlaces de confirmación firmados, con caducidad y de un solo uso.
-
-### 3.5. Épica 5 · Sugerencias e Indicadores (`HU05`)
-- **`ST05.01` y `ST05.03`:** Colección `Sugerencia` con `usuario` (`required`), `recinto` (`required`), `clase` (opcional), `categoria`, `texto` (`required, minlength: 1, maxlength: 500`) y `estado` (`enum: ['nueva', 'revisada'], default: 'nueva'`).
-- **`ST05.05`:** Índices sobre `{ recinto: 1, categoria: 1, createdAt: 1 }` y `{ clase: 1, createdAt: 1 }` para agregaciones rápidas (`Reserva.aggregate` / `Sugerencia.aggregate`) en el panel de indicadores del administrador.
+### 3.3. Épica 3 · Reservas (`HU10` – `HU17` · Sprint 3)
+- **`HU10` (Consultar disponibilidad):** Calcula `cuposLibres = bloque.capacidad - reservasActivas` filtrando por fecha, recinto activo, clase e instructor.
+- **`HU11` (Reservar un cupo):**
+  - Nace en `estado: 'pendiente'`.
+  - Índice único parcial en MongoDB para impedir que el mismo cliente duplique una reserva activa en el mismo bloque y fecha (`409`):
+    ```javascript
+    reservaSchema.index(
+      { bloque: 1, fecha: 1, cliente: 1 },
+      {
+        unique: true,
+        partialFilterExpression: { estado: { $in: ['pendiente', 'confirmada'] } }
+      }
+    );
+    ```
+  - Control de concurrencia verificando que las reservas activas (`pendiente` o `confirmada`) no superen `bloque.capacidad` (`409` si el bloque está lleno).
+- **`HU12` y `HU17` (Cancelación por cliente o coordinador):** Cambia `estado` a `'cancelada'`, libera el cupo y conserva el registro en el historial con `fechaCancelacion`, `gestionadoPor` y `motivoCancelacion` opcional.
+- **`HU14` y `HU16` (Confirmación por cliente o coordinador):** Cambia `estado` de `'pendiente'` a `'confirmada'` (para el cliente, hasta 1 hora antes del inicio del bloque, de forma idempotente), registrando `fechaConfirmacion` y `gestionadoPor`.
 
 ---
 
-## 4. Matriz de Trazabilidad del Modelo E-R (`HU01` – `HU05`)
+## 4. Matriz de Trazabilidad Completa
 
-| Historia | Subtareas Cubiertas | Modelos Mongoose / Colecciones MongoDB |
-| :--- | :--- | :--- |
-| **`HU01`** | `ST01.01`, `ST01.02`, `ST01.03`, `ST01.05`, `ST01.07` | `User` (`users`), `PERMISOS` (`config/permisos.js`) |
-| **`HU02`** | `ST02.01`, `ST02.02`, `ST02.04`, `ST02.05`, `ST02.06`, `ST02.07`, `ST02.09` | `Recinto` (`recintos`), `Clase` (`clases`), `BloqueDisponibilidad` (`bloques`) |
-| **`HU03`** | `ST03.01`, `ST03.02`, `ST03.03`, `ST03.05`, `ST03.06`, `ST03.08`, `ST03.10` | `Reserva` (`reservas`), `BloqueDisponibilidad`, `Recinto` |
-| **`HU04`** | `ST04.02`, `ST04.03`, `ST04.04`, `ST04.06`, `ST04.07` | `Reserva` (`recordatorioEnviado`, `tokenConfirmacion`, `tokenExpiraEn`, `tokenUsadoEn`) |
-| **`HU05`** | `ST05.01`, `ST05.03`, `ST05.04`, `ST05.05` | `Sugerencia` (`sugerencias`) |
+| Sprint | Épica | Historias de Usuario | Modelos / Colecciones |
+| :--- | :--- | :--- | :--- |
+| **Sprint 1** | Transversal + Épica 1 | `TR.01`–`TR.04`, `HU01`, `HU02`, `HU03` | `User` (`users`), `PERMISOS` |
+| **Sprint 2** | Épica 2 · Recintos y Horarios | `HU04`, `HU05`, `HU06`, `HU07`, `HU08`, `HU09` | `Recinto`, `Clase`, `BloqueDisponibilidad` |
+| **Sprint 3** | Épica 3 · Reservas | `HU10`, `HU11`, `HU12`, `HU13`, `HU14`, `HU15`, `HU16`, `HU17` | `Reserva`, `BloqueDisponibilidad`, `Recinto` |
+| **Sprint 4** | Épicas 4 y 5 | Notificaciones y Sugerencias / Indicadores | `Reserva` (`recordatorioEnviado`, `token*`), `Sugerencia` |
