@@ -23,9 +23,6 @@ function nombreDia(numero) {
 }
 
 const ROLES_META = {
-import Icon from '../components/Icon.jsx';
-
-const ROLES = {
   cliente: {
     nombre: 'Cliente',
     icono: 'calendar',
@@ -309,7 +306,6 @@ export default function Dashboard({ usuario, onSalir }) {
           <div className="flex items-center gap-3">
             <span className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-bold text-[#1268e8]">
               {rolInfo.nombre}
-              {rol.nombre}
             </span>
             <button onClick={onSalir} className="secondary-button !px-4 !py-2.5">
               Cerrar sesión
@@ -988,34 +984,11 @@ export default function Dashboard({ usuario, onSalir }) {
           </div>
         )}
 
-      <section className="mx-auto max-w-7xl px-5 py-12 lg:px-8">
-        <p className="section-kicker">Panel de {rol.nombre}</p>
-        <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">Hola de nuevo</h1>
-        <p className="mt-4 max-w-2xl text-lg leading-8 text-slate-500">{rol.descripcion}</p>
-
-        <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {rol.modulos.map((modulo, index) => (
-            <article
-              key={modulo}
-              className="rounded-[22px] border border-slate-200 bg-white p-6 transition duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-100/60"
-            >
-              <div
-                className={`mb-6 grid h-12 w-12 place-items-center rounded-2xl ${index === 0 ? 'bg-[#1268e8] text-white' : 'bg-blue-50 text-[#1268e8]'}`}
-              >
-                <Icon name={rol.icono} className="h-6 w-6" />
-              </div>
-              <h2 className="text-lg font-bold">{modulo}</h2>
-              <p className="mt-1 text-sm text-slate-400">Disponible en los próximos sprints.</p>
-            </article>
-          ))}
-        </div>
-
         <div className="mt-10 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-700">
           <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-emerald-500 text-white">
             <Icon name="check" className="h-4 w-4" />
           </span>
           Sprints 1 y 2 activos: Autenticación, Roles, Recintos, Clases y Bloques de Disponibilidad (HU01 a HU09).
-          Sprint 1 completado: autenticación, sesión y control de acceso por rol.
         </div>
       </section>
     </main>

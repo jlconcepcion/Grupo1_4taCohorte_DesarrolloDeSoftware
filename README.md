@@ -22,7 +22,7 @@ Aplicación web para la gestión integral de reservas de canchas deportivas y cl
 │   └── seeds/                # Datos semilla (integrados también en backend/src/scripts/seed.js)
 ├── tests/                    # Documentación y referencia de suites de pruebas automatizadas
 ├── docs/                     # Documentación del proyecto, Modelo E-R (TR.03) y Matriz RBAC (ST01.05)
-├── docker-compose.yml        # Orquestación de contenedores: mongo:7, backend (:3000) y frontend (:8080)
+├── docker-compose.yml        # Orquestación: backend (:3000), frontend (:8080) y Mongo local opcional (perfil local-db)
 ├── .env.example              # Plantilla de variables de entorno
 ├── .gitignore                # Exclusión de dependencias, builds, .env y archivos locales
 ├── CONTRIBUTING.md           # Guía de contribución, flujo de ramas y convención de commits
@@ -60,27 +60,37 @@ Aplicación web para la gestión integral de reservas de canchas deportivas y cl
    ```
 
 2. **Configurar variables de entorno:**
-   Copiar el archivo de ejemplo `.env.example` a `.env` y ajustar el `JWT_SECRET`.
-   > **Nota:** Nunca subir archivos `.env` al repositorio.
+   Copiar `backend/.env.example` a `backend/.env`, completar `MONGODB_URI` con la cadena de conexión de MongoDB Atlas y ajustar el `JWT_SECRET`.
+   > **Nota:** Nunca subir archivos `.env` al repositorio. Si la contraseña de Atlas contiene caracteres especiales, codifícalos en la URI (por ejemplo `@` → `%40`).
 
 ---
 
 ## Levantamiento con Docker (Recomendado · `TR.02`)
 
-Levanta todo el entorno (`mongo:7`, `backend` y `frontend`) con un solo comando:
+Levanta `backend` y `frontend` con un solo comando. El backend usa la base de datos configurada en `backend/.env`; por defecto, MongoDB Atlas.
 
 ```bash
-cp .env.example .env       # PowerShell: Copy-Item .env.example .env
+cp backend/.env.example backend/.env   # PowerShell: Copy-Item backend/.env.example backend/.env
 docker compose up -d --build
 ```
+
+El clúster de Atlas debe tener un usuario de base de datos con permisos sobre `reservas_gimnasio` y la IP actual habilitada en **Network Access**.
 
 ### Servicios Activos
 
 | Servicio | URL | Descripción |
 | :--- | :--- | :--- |
 | **Frontend (React + Vite + Nginx)** | http://localhost:8080 | Landing pública, Login, Registro y Panel por rol |
-| **API REST (Express + Mongoose)** | http://localhost:3000/api/health | Backend API REST conectada a MongoDB |
-| **MongoDB 7** | `localhost:27017` | Base de datos `reservas_gimnasio` |
+| **API REST (Express + Mongoose)** | http://localhost:3000/api/health | Backend API REST conectada a MongoDB Atlas |
+| **MongoDB Atlas** | Cluster externo | Base de datos `reservas_gimnasio` |
+
+### MongoDB Local Opcional
+
+El servicio `mongo` no se inicia por defecto. Para usar un MongoDB local en Docker, cambia `MONGODB_URI` en `backend/.env` a `mongodb://mongo:27017/reservas_gimnasio` y levanta el perfil:
+
+```bash
+docker compose --profile local-db up -d --build
+```
 
 ### Cargar Datos de Prueba (Usuarios, Recintos, Clases y Bloques)
 
@@ -93,7 +103,7 @@ Cargar los usuarios de prueba (con los contenedores arriba):
 docker compose exec backend npm run seed
 ```
 
-El seed crea o actualiza los 4 usuarios de prueba y registra además 3 recintos iniciales (*Cancha 1*, *Sala Funcional Principal* y *Sala de Spinning*), 2 clases y 2 bloques de disponibilidad:
+El seed se ejecuta contra la base configurada en `backend/.env` (Atlas por defecto) y crea o actualiza los 4 usuarios de prueba, 3 recintos iniciales (*Cancha 1*, *Sala Funcional Principal* y *Sala de Spinning*), 2 clases y 2 bloques de disponibilidad:
 
 | Rol | Correo | Contraseña |
 | :--- | :--- | :--- |
@@ -102,7 +112,7 @@ El seed crea o actualiza los 4 usuarios de prueba y registra además 3 recintos 
 | **Instructor** | `instructor@gym.com` | `Instructor12345` |
 | **Cliente** | `cliente@gym.com` | `Cliente12345` |
 
-Para detener el entorno: `docker compose down` (agregar `-v` para borrar los datos de MongoDB).
+Para detener el entorno: `docker compose down`. Agregar `-v` elimina el volumen de MongoDB local, pero no afecta los datos en Atlas.
 
 ---
 
@@ -111,7 +121,7 @@ Para detener el entorno: `docker compose down` (agregar `-v` para borrar los dat
 **Backend:**
 ```bash
 cd backend
-cp .env.example .env        # completar MONGODB_URI y JWT_SECRET
+cp .env.example .env        # completar MONGODB_URI (Atlas) y JWT_SECRET
 npm install
 npm run dev
 ```
@@ -155,6 +165,8 @@ Disponible en http://localhost:5173 (Vite redirige `/api` al backend en el puert
 cd backend && npm test -- --runInBand   # 6 suites / 45 pruebas en Jest + Supertest (Sprints 1 y 2)
 cd frontend && npm run build            # Verificación de compilación de React + Vite
 ```
+
+Las pruebas de backend usan mocks y no se conectan a MongoDB Atlas.
 
 - **Modelo Entidad-Relación (`TR.03`):** [docs/modelo_entidad_relacion.md](./docs/modelo_entidad_relacion.md)
 - **Matriz de Permisos por Rol (`ST01.05`):** [docs/permisos.md](./docs/permisos.md)

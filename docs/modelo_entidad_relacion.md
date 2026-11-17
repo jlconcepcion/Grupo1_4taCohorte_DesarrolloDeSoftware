@@ -5,7 +5,7 @@
 **Stack Oficial del Proyecto:**
 - **Frontend (`frontend/`):** React 18 + Vite 6 + Tailwind CSS v4 (Nginx en puerto `8080` / Vite en `5173`).
 - **Backend (`backend/`):** Node.js + Express 5 + Mongoose 9 + JWT + `bcryptjs` (API REST en puerto `3000`).
-- **Base de Datos (`mongo`):** MongoDB 7 (`mongodb://mongo:27017/reservas_gimnasio`).
+- **Base de Datos:** MongoDB Atlas (BD `reservas_gimnasio`; URI `mongodb+srv` configurada en `backend/.env`).
 
 ---
 
@@ -18,8 +18,9 @@ flowchart TB
     subgraph DockerCompose["Entorno Docker Compose (TR.02)"]
         Frontend["Contenedor frontend (:8080)\nReact 18 + Vite 6 + Tailwind CSS v4\n(Landing, Login, Registro, Dashboard)"]
         Backend["Contenedor backend (:3000)\nNode.js + Express 5 + Mongoose 9\nMiddlewares: autenticar (JWT) + requirePermiso (RBAC)"]
-        Mongo[("Contenedor mongo (:27017)\nMongoDB 7 · BD: reservas_gimnasio")]
     end
+
+    Mongo[("MongoDB Atlas\nBD: reservas_gimnasio")]
 
     Browser --> Frontend
     Frontend -- "API REST (/api/*)" --> Backend
