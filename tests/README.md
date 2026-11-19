@@ -12,6 +12,7 @@ Las suites de pruebas automatizadas del proyecto se ejecutan con **Jest + Supert
 | [roles.test.js](../backend/tests/roles.test.js) | Unidad del middleware `requirePermiso` y matriz RBAC | `ST01.05` |
 | [coordinador.test.js](../backend/tests/coordinador.test.js) | Verificación de permisos autorizados y denegados para el rol coordinador | `ST01.05`, `ST01.08` |
 | [sprint2_recintos_horarios.test.js](../backend/tests/sprint2_recintos_horarios.test.js) | CRUD de recintos, clases en recintos activos, validación de horarios, rechazo de bloques solapados, auditoría de coordinador y bloqueo de eliminación con reservas activas | `HU04` – `HU09`, `ST02.01` – `ST02.11` |
+| [sprint3_reservas.test.js](../backend/tests/sprint3_reservas.test.js) | Consulta de disponibilidad, reserva de cupos con concurrencia, confirmación/cancelación de cliente y coordinador, reasignación por admin y flujo E2E completo | `HU10` – `HU17`, `ST03.01` – `ST03.11` |
 
 ## Ejecución
 

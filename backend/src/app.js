@@ -5,6 +5,7 @@ const usuariosRoutes = require('./routes/usuarios.routes');
 const recintosRoutes = require('./routes/recintos.routes');
 const clasesRoutes = require('./routes/clases.routes');
 const bloquesRoutes = require('./routes/bloques.routes');
+const reservasRoutes = require('./routes/reservas.routes');
 const { autenticar } = require('./middlewares/auth');
 
 const app = express();
@@ -20,5 +21,6 @@ app.use('/api/usuarios', autenticar, usuariosRoutes);
 app.use('/api/recintos', autenticar, recintosRoutes);
 app.use('/api/clases', autenticar, clasesRoutes);
 app.use('/api/bloques', autenticar, bloquesRoutes);
+app.use('/api/reservas', autenticar, reservasRoutes);
 
 module.exports = app;
