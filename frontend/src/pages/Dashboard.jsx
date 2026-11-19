@@ -22,6 +22,36 @@ function nombreDia(numero) {
   return encontrado ? encontrado.etiqueta : `Día ${numero}`;
 }
 
+const REGISTROS_POR_PAGINA = 5;
+
+function Paginacion({ etiqueta, pagina, totalPaginas, totalRegistros, onCambiar }) {
+  return (
+    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4 text-xs text-slate-500">
+      <span>
+        {etiqueta}: {totalRegistros} registros · página {pagina} de {totalPaginas}
+      </span>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => onCambiar(pagina - 1)}
+          disabled={pagina <= 1}
+          className="rounded-lg border border-slate-200 px-3 py-1.5 font-semibold hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Anterior
+        </button>
+        <button
+          type="button"
+          onClick={() => onCambiar(pagina + 1)}
+          disabled={pagina >= totalPaginas}
+          className="rounded-lg border border-slate-200 px-3 py-1.5 font-semibold hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Siguiente
+        </button>
+      </div>
+    </div>
+  );
+}
+
 const ROLES_META = {
   cliente: {
     nombre: 'Cliente',
@@ -103,6 +133,11 @@ export default function Dashboard({ usuario, onSalir }) {
   const [filtroRecinto, setFiltroRecinto] = useState('');
   const [filtroDia, setFiltroDia] = useState('');
 
+  // Navegación y paginación del panel administrador
+  const [vistaAdmin, setVistaAdmin] = useState('recintos');
+  const [paginaRecintos, setPaginaRecintos] = useState(1);
+  const [paginaUsuarios, setPaginaUsuarios] = useState(1);
+
   function limpiarAvisos() {
     setMensajeExito('');
     setMensajeError('');
@@ -141,6 +176,26 @@ export default function Dashboard({ usuario, onSalir }) {
   }, [usuario?.rol]);
 
   const recintosActivos = recintos.filter((r) => r.activo !== false);
+
+  const totalPaginasRecintos = Math.max(
+    1,
+    Math.ceil(recintos.length / REGISTROS_POR_PAGINA)
+  );
+  const paginaRecintosActual = Math.min(paginaRecintos, totalPaginasRecintos);
+  const recintosPagina = recintos.slice(
+    (paginaRecintosActual - 1) * REGISTROS_POR_PAGINA,
+    paginaRecintosActual * REGISTROS_POR_PAGINA
+  );
+
+  const totalPaginasUsuarios = Math.max(
+    1,
+    Math.ceil(usuarios.length / REGISTROS_POR_PAGINA)
+  );
+  const paginaUsuariosActual = Math.min(paginaUsuarios, totalPaginasUsuarios);
+  const usuariosPagina = usuarios.slice(
+    (paginaUsuariosActual - 1) * REGISTROS_POR_PAGINA,
+    paginaUsuariosActual * REGISTROS_POR_PAGINA
+  );
 
   // ===========================================================================
   // Acciones Administrador: Recintos (HU04, HU05, ST02.03) y Usuarios (HU03)
@@ -349,12 +404,39 @@ export default function Dashboard({ usuario, onSalir }) {
                 VISTA ADMINISTRADOR: Recintos (HU04/HU05) y Usuarios (HU03)
             =============================================================== */}
             {usuario?.rol === 'administrador' && (
-              <div className="grid gap-8 lg:grid-cols-2">
-                {/* Gestión de Recintos (ST02.03) */}
-                <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
-                  <h2 className="text-xl font-bold">
-                    {formRecinto.id ? 'Editar Recinto (HU05)' : 'Crear Nuevo Recinto (HU04)'}
-                  </h2>
+              <div className="space-y-6">
+                <div className="flex flex-wrap items-center gap-2 rounded-[22px] border border-slate-200 bg-white p-2 shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => setVistaAdmin('recintos')}
+                    className={`rounded-xl px-4 py-2 text-sm font-bold transition ${
+                      vistaAdmin === 'recintos'
+                        ? 'bg-[#1268e8] text-white shadow-sm'
+                        : 'text-slate-500 hover:bg-slate-50'
+                    }`}
+                  >
+                    Recintos ({recintos.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setVistaAdmin('usuarios')}
+                    className={`rounded-xl px-4 py-2 text-sm font-bold transition ${
+                      vistaAdmin === 'usuarios'
+                        ? 'bg-[#1268e8] text-white shadow-sm'
+                        : 'text-slate-500 hover:bg-slate-50'
+                    }`}
+                  >
+                    Usuarios ({usuarios.length})
+                  </button>
+                </div>
+
+                {vistaAdmin === 'recintos' && (
+                  <div className="space-y-6">
+                    {/* Gestión de Recintos (ST02.03) */}
+                    <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
+                      <h2 className="text-xl font-bold">
+                        {formRecinto.id ? 'Editar Recinto (HU05)' : 'Crear Nuevo Recinto (HU04)'}
+                      </h2>
                   <p className="mt-1 text-xs text-slate-400">
                     Desactivar un recinto lo oculta para nuevas reservas conservando su historial.
                   </p>
@@ -424,9 +506,23 @@ export default function Dashboard({ usuario, onSalir }) {
                       )}
                     </div>
                   </form>
+                    </div>
 
-                  <div className="mt-6 divide-y divide-slate-100">
-                    {recintos.map((r) => (
+                    <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <h2 className="text-xl font-bold">Listado de recintos</h2>
+                          <p className="mt-1 text-xs text-slate-400">
+                            Consulta, edita o cambia el estado de los recintos registrados.
+                          </p>
+                        </div>
+                        <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-[#1268e8]">
+                          {recintos.length} en total
+                        </span>
+                      </div>
+
+                      <div className="mt-4 divide-y divide-slate-100">
+                        {recintosPagina.map((r) => (
                       <div
                         key={r._id}
                         className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm"
@@ -473,13 +569,25 @@ export default function Dashboard({ usuario, onSalir }) {
                       </div>
                     ))}
                   </div>
-                </div>
 
-                {/* Creación de Usuarios e Instructores (HU03 / ST01.07) */}
-                <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
-                  <h2 className="text-xl font-bold">
-                    Crear Usuario o Instructor (HU03)
-                  </h2>
+                  <Paginacion
+                    etiqueta="Recintos"
+                    pagina={paginaRecintosActual}
+                    totalPaginas={totalPaginasRecintos}
+                    totalRegistros={recintos.length}
+                    onCambiar={setPaginaRecintos}
+                  />
+                    </div>
+                  </div>
+                )}
+
+                {vistaAdmin === 'usuarios' && (
+                  <div className="space-y-6">
+                    {/* Creación de Usuarios e Instructores (HU03 / ST01.07) */}
+                    <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
+                      <h2 className="text-xl font-bold">
+                        Crear Usuario o Instructor (HU03)
+                      </h2>
                   <p className="mt-1 text-xs text-slate-400">
                     Asigna cuentas con rol instructor, coordinador, cliente o administrador.
                   </p>
@@ -535,9 +643,23 @@ export default function Dashboard({ usuario, onSalir }) {
                       Crear cuenta con rol
                     </button>
                   </form>
+                    </div>
 
-                  <div className="mt-6 max-h-56 divide-y divide-slate-100 overflow-y-auto">
-                    {usuarios.map((u) => (
+                    <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <h2 className="text-xl font-bold">Listado de usuarios</h2>
+                          <p className="mt-1 text-xs text-slate-400">
+                            Consulta las cuentas registradas y su rol asignado.
+                          </p>
+                        </div>
+                        <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-[#1268e8]">
+                          {usuarios.length} en total
+                        </span>
+                      </div>
+
+                      <div className="mt-4 divide-y divide-slate-100">
+                        {usuariosPagina.map((u) => (
                       <div
                         key={u._id}
                         className="flex items-center justify-between py-2.5 text-sm"
@@ -549,7 +671,17 @@ export default function Dashboard({ usuario, onSalir }) {
                       </div>
                     ))}
                   </div>
-                </div>
+
+                  <Paginacion
+                    etiqueta="Usuarios"
+                    pagina={paginaUsuariosActual}
+                    totalPaginas={totalPaginasUsuarios}
+                    totalRegistros={usuarios.length}
+                    onCambiar={setPaginaUsuarios}
+                  />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -984,12 +1116,6 @@ export default function Dashboard({ usuario, onSalir }) {
           </div>
         )}
 
-        <div className="mt-10 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-700">
-          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-emerald-500 text-white">
-            <Icon name="check" className="h-4 w-4" />
-          </span>
-          Sprints 1 y 2 activos: Autenticación, Roles, Recintos, Clases y Bloques de Disponibilidad (HU01 a HU09).
-        </div>
       </section>
     </main>
   );
