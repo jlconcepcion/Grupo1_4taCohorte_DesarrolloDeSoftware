@@ -41,6 +41,17 @@ async function peticion(ruta, opciones = {}) {
   return datos;
 }
 
+function armarQuery(params = {}) {
+  const limpio = {};
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== null && v !== '') {
+      limpio[k] = v;
+    }
+  }
+  const qs = new URLSearchParams(limpio).toString();
+  return qs ? `?${qs}` : '';
+}
+
 export const auth = {
   login: (correo, password) =>
     peticion('/auth/login', {
@@ -80,10 +91,7 @@ export const recintosApi = {
 };
 
 export const clasesApi = {
-  listar: (params = {}) => {
-    const qs = new URLSearchParams(params).toString();
-    return peticion(`/clases${qs ? `?${qs}` : ''}`);
-  },
+  listar: (params = {}) => peticion(`/clases${armarQuery(params)}`),
   crear: (datos) =>
     peticion('/clases', {
       method: 'POST',
@@ -97,10 +105,7 @@ export const clasesApi = {
 };
 
 export const bloquesApi = {
-  listar: (params = {}) => {
-    const qs = new URLSearchParams(params).toString();
-    return peticion(`/bloques${qs ? `?${qs}` : ''}`);
-  },
+  listar: (params = {}) => peticion(`/bloques${armarQuery(params)}`),
   crear: (datos) =>
     peticion('/bloques', {
       method: 'POST',
@@ -115,4 +120,41 @@ export const bloquesApi = {
     peticion(`/bloques/${id}`, {
       method: 'DELETE',
     }),
+};
+
+export const reservasApi = {
+  disponibilidad: (filtros = {}) =>
+    peticion(`/reservas/disponibilidad${armarQuery(filtros)}`),
+  crear: ({ bloqueId, fecha }) =>
+    peticion('/reservas', {
+      method: 'POST',
+      body: JSON.stringify({ bloqueId, fecha }),
+    }),
+  mias: (tipo = 'todas') => peticion(`/reservas/mias${armarQuery({ tipo })}`),
+  confirmarAsistencia: (id) =>
+    peticion(`/reservas/${id}/confirmar-asistencia`, {
+      method: 'PATCH',
+    }),
+  cancelarPropia: (id, motivo = '') =>
+    peticion(`/reservas/${id}/cancelar-propia`, {
+      method: 'PATCH',
+      body: JSON.stringify({ motivo }),
+    }),
+  listarTodas: (filtros = {}) => peticion(`/reservas${armarQuery(filtros)}`),
+  confirmarCoordinador: (id) =>
+    peticion(`/reservas/${id}/confirmar`, {
+      method: 'PATCH',
+    }),
+  cancelarCoordinador: (id, motivo = '') =>
+    peticion(`/reservas/${id}/cancelar`, {
+      method: 'PATCH',
+      body: JSON.stringify({ motivo }),
+    }),
+  reasignarAdmin: (id, datos) =>
+    peticion(`/reservas/${id}/reasignar`, {
+      method: 'PATCH',
+      body: JSON.stringify(datos),
+    }),
+  conteoInstructor: (filtros = {}) =>
+    peticion(`/reservas/conteo-instructor${armarQuery(filtros)}`),
 };

@@ -46,7 +46,7 @@ Aplicación web para la gestión integral de reservas de canchas deportivas y cl
 
 - **Sprint 1 (Completado):** Tareas transversales (`TR.01` – `TR.04`) y **Épica 1 · Autenticación y usuarios (`HU01` – `HU03` / `ST01.01` – `ST01.08`)**.
 - **Sprint 2 (Completado):** **Épica 2 · Gestión de recintos y horarios (`HU04` – `HU09` / `ST02.01` – `ST02.11`)**.
-- **Sprint 3:** **Épica 3 · Reservas (`HU10` – `HU17` / `ST03.01` – `ST03.11`)**.
+- **Sprint 3 (Completado):** **Épica 3 · Reservas (`HU10` – `HU17` / `ST03.01` – `ST03.11`)**.
 - **Sprint 4:** **Épica 4 · Notificaciones** y **Épica 5 · Sugerencias de los clientes**.
 
 ---
@@ -136,7 +136,7 @@ Disponible en http://localhost:5173 (Vite redirige `/api` al backend en el puert
 
 ---
 
-## Endpoints de la API REST (Sprints 1 y 2)
+## Endpoints de la API REST (Sprints 1, 2 y 3)
 
 | Método | Ruta | Descripción | Roles autorizados |
 | :--- | :--- | :--- | :--- |
@@ -156,6 +156,16 @@ Disponible en http://localhost:5173 (Vite redirige `/api` al backend en el puert
 | `POST` | `/api/bloques` | Registrar bloque propio validando no solapamiento (`HU07`) | `instructor` |
 | `PUT / PATCH` | `/api/bloques/:id` | Editar bloque propio (`HU08`) o de cualquier instructor con auditoría (`HU09`) | `instructor` (propio), `coordinador`, `administrador` |
 | `DELETE` | `/api/bloques/:id` | Eliminar bloque sin reservas activas (`ST02.07`, `HU09`) | `instructor` (propio), `coordinador`, `administrador` |
+| `GET` | `/api/reservas/disponibilidad` | Consultar horarios con cupos libres por fecha, recinto y clase (`HU10`, `ST03.03`) | Todos los roles autenticados |
+| `POST` | `/api/reservas` | Reservar un cupo con control de concurrencia (`HU11`, `ST03.05`) | `cliente` |
+| `GET` | `/api/reservas/mias` | Consultar reservas propias (`?tipo=proximas\|pasadas\|todas`) (`HU13`) | `cliente` |
+| `PATCH` | `/api/reservas/:id/confirmar-asistencia` | Confirmar asistencia propia hasta 1h antes (`HU14`) | `cliente` (propietario) |
+| `PATCH` | `/api/reservas/:id/cancelar-propia` | Cancelar reserva propia y liberar cupo (`HU12`, `ST03.06`) | `cliente` (propietario) |
+| `GET` | `/api/reservas` | Consultar todas las reservas con filtros combinados (`HU15`, `ST03.07`) | `coordinador`, `administrador` |
+| `PATCH` | `/api/reservas/:id/confirmar` | Confirmar reserva pendiente (`HU16`, `ST03.08`) | `coordinador`, `administrador` |
+| `PATCH` | `/api/reservas/:id/cancelar` | Cancelar reserva con motivo opcional y liberar cupo (`HU17`, `ST03.08`) | `coordinador`, `administrador` |
+| `PATCH` | `/api/reservas/:id/reasignar` | Editar / reasignar reserva (`ST03.10`) | `administrador` |
+| `GET` | `/api/reservas/conteo-instructor` | Conteo de reservas y confirmadas por clase y horario (`ST03.09`) | `instructor`, `coordinador`, `administrador` |
 
 ---
 
