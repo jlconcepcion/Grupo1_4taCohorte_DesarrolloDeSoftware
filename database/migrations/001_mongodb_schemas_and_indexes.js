@@ -35,7 +35,7 @@ const MONGODB_SCHEMAS = {
           nombre: { bsonType: 'string', minLength: 2 },
           tipo: { bsonType: 'string', minLength: 2 },
           descripcion: { bsonType: 'string' },
-          capacidad: { bsonType: 'int', minimum: 1 },
+          capacidad: { bsonType: 'number', minimum: 1 },
           activo: { bsonType: 'bool' }
         }
       }
@@ -66,7 +66,7 @@ const MONGODB_SCHEMAS = {
     ]
   },
 
-  bloques: {
+  bloquedisponibilidads: {
     validator: {
       $jsonSchema: {
         bsonType: 'object',
@@ -75,12 +75,12 @@ const MONGODB_SCHEMAS = {
           clase: { bsonType: 'objectId' },
           instructor: { bsonType: 'objectId' },
           recinto: { bsonType: 'objectId' },
-          diaSemana: { bsonType: 'int', minimum: 0, maximum: 6 },
+          diaSemana: { bsonType: 'number', minimum: 0, maximum: 6 },
           horaInicio: { bsonType: 'string', pattern: '^([01]\\d|2[0-3]):[0-5]\\d$' },
           horaFin: { bsonType: 'string', pattern: '^([01]\\d|2[0-3]):[0-5]\\d$' },
-          capacidad: { bsonType: 'int', minimum: 1 },
-          modificadoPor: { bsonType: 'objectId' },
-          fechaModificacion: { bsonType: 'date' }
+          capacidad: { bsonType: 'number', minimum: 1 },
+          modificadoPor: { bsonType: ['objectId', 'null'] },
+          fechaModificacion: { bsonType: ['date', 'null'] }
         }
       }
     },
@@ -99,18 +99,18 @@ const MONGODB_SCHEMAS = {
           cliente: { bsonType: 'objectId' },
           bloque: { bsonType: 'objectId' },
           recinto: { bsonType: 'objectId' },
-          clase: { bsonType: 'objectId' },
+          clase: { bsonType: ['objectId', 'null'] },
           fecha: { bsonType: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
           estado: {
             bsonType: 'string',
             enum: ['pendiente', 'confirmada', 'cancelada']
           },
-          gestionadoPor: { bsonType: 'objectId' },
-          fechaConfirmacion: { bsonType: 'date' },
-          fechaCancelacion: { bsonType: 'date' },
-          motivoCancelacion: { bsonType: 'string' },
-          recordatorioEnviado: { bsonType: 'bool' },
-          tokenConfirmacion: { bsonType: 'string' }
+          gestionadoPor: { bsonType: ['objectId', 'null'] },
+          fechaConfirmacion: { bsonType: ['date', 'null'] },
+          fechaCancelacion: { bsonType: ['date', 'null'] },
+          motivoCancelacion: { bsonType: ['string', 'null'] },
+          recordatorioEnviado: { bsonType: ['bool', 'null'] },
+          tokenConfirmacion: { bsonType: ['string', 'null'] }
         }
       }
     },

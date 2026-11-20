@@ -2,25 +2,25 @@ const TOKEN_KEY = 'reservas_token';
 const USER_KEY = 'reservas_usuario';
 
 export function getToken() {
-  return localStorage.getItem(TOKEN_KEY);
+  return sessionStorage.getItem(TOKEN_KEY);
 }
 
 export function getUsuario() {
   try {
-    return JSON.parse(localStorage.getItem(USER_KEY));
+    return JSON.parse(sessionStorage.getItem(USER_KEY));
   } catch {
     return null;
   }
 }
 
 export function guardarSesion(token, usuario) {
-  localStorage.setItem(TOKEN_KEY, token);
-  localStorage.setItem(USER_KEY, JSON.stringify(usuario));
+  sessionStorage.setItem(TOKEN_KEY, token);
+  sessionStorage.setItem(USER_KEY, JSON.stringify(usuario));
 }
 
 export function cerrarSesion() {
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(USER_KEY);
+  sessionStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(USER_KEY);
 }
 
 async function peticion(ruta, opciones = {}) {

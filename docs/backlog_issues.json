@@ -185,7 +185,7 @@
   },
   {
     "id": "ST03.01",
-    "historia": "HU03",
+    "historia": "HU10",
     "sprint": "Sprint 3",
     "area": "BD",
     "subtarea": "Crear la tabla de reservas con estados pendiente, confirmada y cancelada, y fecha de creación.",
@@ -193,7 +193,7 @@
   },
   {
     "id": "ST03.02",
-    "historia": "HU03",
+    "historia": "HU11",
     "sprint": "Sprint 3",
     "area": "BD",
     "subtarea": "Impedir reservas duplicadas sobre el mismo cupo y fecha con una restricción única.",
@@ -201,7 +201,7 @@
   },
   {
     "id": "ST03.03",
-    "historia": "HU03",
+    "historia": "HU10",
     "sprint": "Sprint 3",
     "area": "Backend",
     "subtarea": "Endpoint de consulta de disponibilidad por fecha, recinto y tipo de clase, que solo devuelve horarios sin reserva activa.",
@@ -209,7 +209,7 @@
   },
   {
     "id": "ST03.04",
-    "historia": "HU03",
+    "historia": "HU10",
     "sprint": "Sprint 3",
     "area": "Frontend",
     "subtarea": "Pantalla de consulta de disponibilidad para el cliente, con calendario o lista y filtros.",
@@ -217,7 +217,7 @@
   },
   {
     "id": "ST03.05",
-    "historia": "HU03",
+    "historia": "HU11",
     "sprint": "Sprint 3",
     "area": "Backend",
     "subtarea": "Reservar un cupo dentro de una transacción que valide disponibilidad antes de guardar.",
@@ -225,7 +225,7 @@
   },
   {
     "id": "ST03.06",
-    "historia": "HU03",
+    "historia": "HU12",
     "sprint": "Sprint 3",
     "area": "Backend",
     "subtarea": "Cancelar una reserva propia: pasa a cancelada, libera el cupo y conserva el registro.",
@@ -233,7 +233,7 @@
   },
   {
     "id": "ST03.07",
-    "historia": "HU03",
+    "historia": "HU15",
     "sprint": "Sprint 3",
     "area": "Frontend",
     "subtarea": "Panel del coordinador con listado de reservas filtrable por fecha, recinto y estado.",
@@ -241,7 +241,7 @@
   },
   {
     "id": "ST03.08",
-    "historia": "HU03",
+    "historia": "HU16",
     "sprint": "Sprint 3",
     "area": "Backend",
     "subtarea": "Acciones del coordinador para confirmar o cancelar una reserva.",
@@ -249,7 +249,7 @@
   },
   {
     "id": "ST03.09",
-    "historia": "HU03",
+    "historia": "HU14",
     "sprint": "Sprint 3",
     "area": "Frontend",
     "subtarea": "Vista del instructor con el conteo de reservas y de confirmadas por clase y horario.",
@@ -257,7 +257,7 @@
   },
   {
     "id": "ST03.10",
-    "historia": "HU03",
+    "historia": "HU17",
     "sprint": "Sprint 3",
     "area": "Backend",
     "subtarea": "Extender el panel con permisos de administrador: ver todas las reservas, editar y reasignar.",
@@ -265,7 +265,7 @@
   },
   {
     "id": "ST03.11",
-    "historia": "HU03",
+    "historia": "HU17",
     "sprint": "Sprint 3",
     "area": "Pruebas",
     "subtarea": "Prueba E2E del flujo: reservar, confirmar, cancelar y verificar que el horario vuelve a estar libre.",

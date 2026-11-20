@@ -46,8 +46,8 @@ Aplicación web para la gestión integral de reservas de canchas deportivas y cl
 
 - **Sprint 1 (Completado):** Tareas transversales (`TR.01` – `TR.04`) y **Épica 1 · Autenticación y usuarios (`HU01` – `HU03` / `ST01.01` – `ST01.08`)**.
 - **Sprint 2 (Completado):** **Épica 2 · Gestión de recintos y horarios (`HU04` – `HU09` / `ST02.01` – `ST02.11`)**.
-- **Sprint 3 (Completado):** **Épica 3 · Reservas (`HU10` – `HU17` / `ST03.01` – `ST03.11`)**.
-- **Sprint 4:** **Épica 4 · Notificaciones** y **Épica 5 · Sugerencias de los clientes**.
+- **Sprint 3 (Completado):** **Épica 3 · Reservas (`HU10` – `HU17` / `ST03.01` – `ST03.11`)**, con cierre de concurrencia, fechas, índices y reasignación.
+- **Sprint 4 (Pendiente):** **Épica 4 · Notificaciones** y **Épica 5 · Sugerencias de los clientes**.
 
 ---
 
@@ -90,6 +90,14 @@ El servicio `mongo` no se inicia por defecto. Para usar un MongoDB local en Dock
 
 ```bash
 docker compose --profile local-db up -d --build
+```
+
+### Aplicar Validadores e Índices
+
+Con los contenedores levantados, sincroniza los esquemas e índices de MongoDB antes de sembrar datos:
+
+```bash
+docker compose exec backend npm run migrate
 ```
 
 ### Cargar Datos de Prueba (Usuarios, Recintos, Clases y Bloques)
@@ -172,7 +180,7 @@ Disponible en http://localhost:5173 (Vite redirige `/api` al backend en el puert
 ## Pruebas Automatizadas y Documentación
 
 ```bash
-cd backend && npm test -- --runInBand   # 6 suites / 45 pruebas en Jest + Supertest (Sprints 1 y 2)
+cd backend && npm test -- --runInBand   # 7 suites / 64 pruebas en Jest + Supertest (Sprints 1-3)
 cd frontend && npm run build            # Verificación de compilación de React + Vite
 ```
 

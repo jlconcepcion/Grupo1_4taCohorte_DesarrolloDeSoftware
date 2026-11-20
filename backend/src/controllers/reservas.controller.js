@@ -1,14 +1,72 @@
+const mongoose = require('mongoose');
 const Reserva = require('../models/Reserva');
 const { ESTADOS_RESERVA } = require('../models/Reserva');
 const BloqueDisponibilidad = require('../models/BloqueDisponibilidad');
 const Recinto = require('../models/Recinto');
 const Clase = require('../models/Clase');
+const User = require('../models/User');
 
 const FECHA_REGEX = /^\d{4}-\d{2}-\d{2}$/;
-
-// Cola de exclusión mutua en memoria por (bloqueId + fecha) para garantizar ST03.05 / HU11
-// (dos solicitudes simultáneas para el mismo último cupo se serializan atómicamente)
 const colasPorCupo = new Map();
+
+function esFechaCalendarioValida(fechaStr) {
+  if (!FECHA_REGEX.test(fechaStr)) return false;
+  const [anio, mes, dia] = String(fechaStr).split('-').map(Number);
+  const dt = new Date(Date.UTC(anio, mes - 1, dia, 12, 0, 0));
+  return (
+    dt.getUTCFullYear() === anio &&
+    dt.getUTCMonth() === mes - 1 &&
+    dt.getUTCDate() === dia
+  );
+}
+
+function esFechaFutura(fechaStr) {
+  const [anio, mes, dia] = String(fechaStr).split('-').map(Number);
+  const fecha = new Date(anio, mes - 1, dia, 0, 0, 0, 0);
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  return fecha.getTime() >= hoy.getTime();
+}
+
+function hayTransacciones() {
+  const uri = String(process.env.MONGODB_URI || '');
+  return uri.includes('mongodb+srv://') || uri.includes('replicaSet=');
+}
+
+function conSesion(consulta, session) {
+  return session && consulta && typeof consulta.session === 'function'
+    ? consulta.session(session)
+    : consulta;
+}
+
+function opcionesSesion(session) {
+  return session ? { session } : {};
+}
+
+async function ejecutarEnTransaccion(tarea) {
+  if (
+    hayTransacciones() &&
+    mongoose.connection &&
+    mongoose.connection.readyState === 1 &&
+    typeof mongoose.startSession === 'function'
+  ) {
+    const session = await mongoose.startSession();
+    try {
+      session.startTransaction();
+      const resultado = await tarea(session);
+      await session.commitTransaction();
+      return resultado;
+    } catch (err) {
+      if (session.inTransaction()) {
+        await session.abortTransaction();
+      }
+      throw err;
+    } finally {
+      await session.endSession();
+    }
+  }
+  return tarea(null);
+}
 
 async function ejecutarConBloqueo(clave, tarea) {
   const previa = colasPorCupo.get(clave) || Promise.resolve();
@@ -16,25 +74,23 @@ async function ejecutarConBloqueo(clave, tarea) {
   const actual = new Promise((resolve) => {
     liberar = resolve;
   });
-  colasPorCupo.set(
-    clave,
-    previa.then(() => actual)
-  );
+  const encadenada = previa.then(() => actual);
+  colasPorCupo.set(clave, encadenada);
 
   await previa;
   try {
     return await tarea();
   } finally {
     liberar();
-    if (colasPorCupo.get(clave) === actual) {
+    if (colasPorCupo.get(clave) === encadenada) {
       colasPorCupo.delete(clave);
     }
   }
 }
 
 function obtenerDiaSemanaDeFecha(fechaStr) {
-  if (!FECHA_REGEX.test(fechaStr)) return null;
-  const [anio, mes, dia] = fechaStr.split('-').map(Number);
+  if (!esFechaCalendarioValida(fechaStr)) return null;
+  const [anio, mes, dia] = String(fechaStr).split('-').map(Number);
   const dt = new Date(Date.UTC(anio, mes - 1, dia, 12, 0, 0));
   if (Number.isNaN(dt.getTime())) return null;
   return dt.getUTCDay();
@@ -48,20 +104,35 @@ function construirFechaHoraLocal(fechaStr, horaStr = '00:00') {
   return new Date(anio, (mes || 1) - 1, dia || 1, hh || 0, mm || 0, 0, 0);
 }
 
-async function sincronizarContadorBloque(bloqueId) {
-  try {
-    const bloque = await BloqueDisponibilidad.findById(bloqueId);
-    if (!bloque) return;
-    const totalActivas = await Reserva.countDocuments({
+async function obtenerHoraInicioReserva(reserva) {
+  if (reserva.bloque?.horaInicio) return reserva.bloque.horaInicio;
+  const bloqueId = reserva.bloque?._id || reserva.bloque;
+  if (!bloqueId) return null;
+  const bloque = await BloqueDisponibilidad.findById(bloqueId);
+  return bloque?.horaInicio || null;
+}
+
+async function sincronizarContadorBloque(bloqueId, session) {
+  const conteo = await Reserva.countDocuments(
+    {
       bloque: bloqueId,
       estado: { $in: ['pendiente', 'confirmada'] },
-    });
-    bloque.reservasActivas = totalActivas;
-    if (typeof bloque.save === 'function') {
-      await bloque.save();
-    }
-  } catch (_) {
-    // Ignorar en caso de mocks unitarios simplificados
+    },
+    opcionesSesion(session)
+  );
+  const total = Number(conteo || 0);
+  const bloque = await conSesion(BloqueDisponibilidad.findById(bloqueId), session);
+  if (!bloque) return;
+
+  bloque.reservasActivas = total;
+  if (typeof bloque.save === 'function') {
+    await bloque.save(opcionesSesion(session));
+  } else if (typeof BloqueDisponibilidad.updateOne === 'function') {
+    await BloqueDisponibilidad.updateOne(
+      { _id: bloqueId },
+      { $set: { reservasActivas: total } },
+      opcionesSesion(session)
+    );
   }
 }
 
@@ -88,8 +159,11 @@ async function consultarDisponibilidad(req, res) {
   try {
     const { fecha, recinto, clase, instructor } = req.query || {};
 
-    if (fecha !== undefined && fecha !== '' && !FECHA_REGEX.test(fecha)) {
+    if (fecha !== undefined && fecha !== '' && !esFechaCalendarioValida(fecha)) {
       return res.status(400).json({ mensaje: 'El formato de fecha debe ser YYYY-MM-DD' });
+    }
+    if (fecha && !esFechaFutura(fecha)) {
+      return res.status(400).json({ mensaje: 'La fecha debe ser futura o el día de hoy' });
     }
 
     const filtroBloques = {};
@@ -166,8 +240,10 @@ async function crearReserva(req, res) {
 
   const errores = [];
   if (!idBloque) errores.push('El bloque de horario es obligatorio');
-  if (!fecha || !FECHA_REGEX.test(String(fecha).trim())) {
+  if (!fecha || !esFechaCalendarioValida(String(fecha).trim())) {
     errores.push('La fecha es obligatoria y debe tener formato YYYY-MM-DD');
+  } else if (!esFechaFutura(String(fecha).trim())) {
+    errores.push('La fecha debe ser futura o el día de hoy');
   }
 
   if (errores.length) {
@@ -177,79 +253,128 @@ async function crearReserva(req, res) {
   const fechaLimpia = String(fecha).trim();
   const claveConcurrencia = `${idBloque}:${fechaLimpia}`;
 
-  return ejecutarConBloqueo(claveConcurrencia, async () => {
-    try {
-      const bloqueDoc = await BloqueDisponibilidad.findById(idBloque);
-      if (!bloqueDoc) {
-        return res.status(404).json({ mensaje: 'El bloque de horario no existe' });
-      }
+  let resultado;
+  try {
+    resultado = await ejecutarConBloqueo(claveConcurrencia, async () =>
+      ejecutarEnTransaccion(async (session) => {
+        try {
+          const bloqueDoc = await conSesion(
+            BloqueDisponibilidad.findById(idBloque),
+            session
+          );
+          if (!bloqueDoc) {
+            return { status: 404, body: { mensaje: 'El bloque de horario no existe' } };
+          }
 
-      const recintoId = bloqueDoc.recinto?._id || bloqueDoc.recinto;
-      const recintoDoc = await Recinto.findById(recintoId);
-      if (!recintoDoc || recintoDoc.activo === false) {
-        return res
-          .status(400)
-          .json({ mensaje: 'El recinto asociado a este horario no está disponible' });
-      }
+          const recintoId = bloqueDoc.recinto?._id || bloqueDoc.recinto;
+          const recintoDoc = await conSesion(Recinto.findById(recintoId), session);
+          if (!recintoDoc || recintoDoc.activo === false) {
+            return {
+              status: 400,
+              body: { mensaje: 'El recinto asociado a este horario no está disponible' },
+            };
+          }
 
-      const diaFecha = obtenerDiaSemanaDeFecha(fechaLimpia);
-      if (
-        bloqueDoc.diaSemana !== undefined &&
-        diaFecha !== null &&
-        Number(bloqueDoc.diaSemana) !== diaFecha
-      ) {
-        return res.status(400).json({
-          mensaje: 'La fecha seleccionada no corresponde al día de la semana del bloque',
-        });
-      }
+          if (bloqueDoc.clase) {
+            const claseId = bloqueDoc.clase?._id || bloqueDoc.clase;
+            const claseDoc = await conSesion(Clase.findById(claseId), session);
+            if (claseDoc && claseDoc.activa === false) {
+              return {
+                status: 400,
+                body: { mensaje: 'La clase asociada a este horario no está disponible' },
+              };
+            }
+          }
 
-      // HU11 / ST03.02: Verificar si el cliente ya tiene una reserva activa para ese bloque y fecha
-      const duplicada = await Reserva.findOne({
-        bloque: bloqueDoc._id || idBloque,
-        fecha: fechaLimpia,
-        cliente: req.user.id,
-        estado: { $in: ['pendiente', 'confirmada'] },
-      });
+          const diaFecha = obtenerDiaSemanaDeFecha(fechaLimpia);
+          if (
+            bloqueDoc.diaSemana !== undefined &&
+            diaFecha !== null &&
+            Number(bloqueDoc.diaSemana) !== diaFecha
+          ) {
+            return {
+              status: 400,
+              body: {
+                mensaje: 'La fecha seleccionada no corresponde al día de la semana del bloque',
+              },
+            };
+          }
 
-      if (duplicada) {
-        return res.status(409).json({
-          mensaje: 'Ya tienes una reserva activa para este bloque y fecha',
-        });
-      }
+          const duplicada = await conSesion(
+            Reserva.findOne({
+              bloque: bloqueDoc._id || idBloque,
+              fecha: fechaLimpia,
+              cliente: req.user.id,
+              estado: { $in: ['pendiente', 'confirmada'] },
+            }),
+            session
+          );
 
-      // HU11 / ST03.05: Validar capacidad disponible antes de guardar
-      const reservasActivas = await Reserva.countDocuments({
-        bloque: bloqueDoc._id || idBloque,
-        fecha: fechaLimpia,
-        estado: { $in: ['pendiente', 'confirmada'] },
-      });
+          if (duplicada) {
+            return {
+              status: 409,
+              body: { mensaje: 'Ya tienes una reserva activa para este bloque y fecha' },
+            };
+          }
 
-      if (Number(reservasActivas) >= Number(bloqueDoc.capacidad)) {
-        return res.status(409).json({
-          mensaje: 'El bloque ya no tiene cupos disponibles para esta fecha',
-        });
-      }
+          const reservasActivas = await Reserva.countDocuments(
+            {
+              bloque: bloqueDoc._id || idBloque,
+              fecha: fechaLimpia,
+              estado: { $in: ['pendiente', 'confirmada'] },
+            },
+            opcionesSesion(session)
+          );
 
-      const nuevaReserva = await Reserva.create({
-        cliente: req.user.id,
-        bloque: bloqueDoc._id || idBloque,
-        recinto: recintoId,
-        clase: bloqueDoc.clase?._id || bloqueDoc.clase || null,
-        fecha: fechaLimpia,
-        estado: 'pendiente',
-      });
+          if (Number(reservasActivas) >= Number(bloqueDoc.capacidad)) {
+            return {
+              status: 409,
+              body: { mensaje: 'El bloque ya no tiene cupos disponibles para esta fecha' },
+            };
+          }
 
-      await sincronizarContadorBloque(bloqueDoc._id || idBloque);
-      return res.status(201).json(nuevaReserva);
-    } catch (err) {
-      if (err.code === 11000) {
-        return res.status(409).json({
-          mensaje: 'Ya existe una reserva activa para este cliente en el mismo bloque y fecha',
-        });
-      }
-      return res.status(500).json({ mensaje: 'Error al registrar la reserva' });
-    }
-  });
+          const datosReserva = {
+            cliente: req.user.id,
+            bloque: bloqueDoc._id || idBloque,
+            recinto: recintoId,
+            clase: bloqueDoc.clase?._id || bloqueDoc.clase || null,
+            fecha: fechaLimpia,
+            estado: 'pendiente',
+          };
+
+          const nuevaReserva = session
+            ? (await Reserva.create([datosReserva], { session }))[0]
+            : await Reserva.create(datosReserva);
+
+          if (typeof BloqueDisponibilidad.updateOne === 'function') {
+            await BloqueDisponibilidad.updateOne(
+              { _id: bloqueDoc._id || idBloque },
+              { $inc: { reservasActivas: 1 } },
+              opcionesSesion(session)
+            );
+          }
+          await sincronizarContadorBloque(bloqueDoc._id || idBloque, session);
+          return { status: 201, body: nuevaReserva };
+        } catch (err) {
+          console.error('Error al registrar la reserva:', err.message, err.code);
+          if (err.code === 11000) {
+            return {
+              status: 409,
+              body: {
+                mensaje: 'Ya existe una reserva activa para este cliente en el mismo bloque y fecha',
+              },
+            };
+          }
+          return { status: 500, body: { mensaje: 'Error al registrar la reserva' } };
+        }
+      })
+    );
+  } catch (err) {
+    console.error('Error al registrar la reserva:', err.message, err.code);
+    return res.status(500).json({ mensaje: 'Error al registrar la reserva' });
+  }
+
+  return res.status(resultado.status).json(resultado.body);
 }
 
 // ============================================================================
@@ -322,12 +447,11 @@ async function confirmarAsistenciaCliente(req, res) {
     }
 
     // HU14: Validar límite de 1 hora antes del inicio del bloque
-    let horaInicio = reserva.bloque?.horaInicio;
-    if (!horaInicio && reserva.bloque) {
-      const bDoc = await BloqueDisponibilidad.findById(reserva.bloque);
-      horaInicio = bDoc?.horaInicio;
+    const horaInicio = await obtenerHoraInicioReserva(reserva);
+    if (!horaInicio) {
+      return res.status(409).json({ mensaje: 'No se pudo determinar el horario de la reserva' });
     }
-    const inicioDt = construirFechaHoraLocal(reserva.fecha, horaInicio || '23:59');
+    const inicioDt = construirFechaHoraLocal(reserva.fecha, horaInicio);
     const msRestantes = inicioDt.getTime() - Date.now();
 
     if (msRestantes < 60 * 60 * 1000) {
@@ -375,12 +499,11 @@ async function cancelarReservaPropia(req, res) {
     }
 
     // HU12: Solo se puede cancelar antes del inicio del bloque
-    let horaInicio = reserva.bloque?.horaInicio;
-    if (!horaInicio && reserva.bloque) {
-      const bDoc = await BloqueDisponibilidad.findById(reserva.bloque);
-      horaInicio = bDoc?.horaInicio;
+    const horaInicio = await obtenerHoraInicioReserva(reserva);
+    if (!horaInicio) {
+      return res.status(409).json({ mensaje: 'No se pudo determinar el horario de la reserva' });
     }
-    const inicioDt = construirFechaHoraLocal(reserva.fecha, horaInicio || '23:59');
+    const inicioDt = construirFechaHoraLocal(reserva.fecha, horaInicio);
     if (inicioDt.getTime() <= Date.now()) {
       return res.status(409).json({
         mensaje: 'No se puede cancelar una reserva después del inicio del bloque',
@@ -413,14 +536,22 @@ async function cancelarReservaPropia(req, res) {
 async function listarReservas(req, res) {
   try {
     const { fecha, recinto, clase, instructor, estado } = req.query || {};
-    const filtro = {};
 
+    if (fecha && !esFechaCalendarioValida(fecha)) {
+      return res.status(400).json({ mensaje: 'El formato de fecha debe ser YYYY-MM-DD' });
+    }
+    if (fecha && !esFechaFutura(fecha)) {
+      return res.status(400).json({ mensaje: 'La fecha debe ser futura o el día de hoy' });
+    }
+    if (estado && !ESTADOS_RESERVA.includes(estado)) {
+      return res.status(400).json({ mensaje: 'El estado indicado no es válido' });
+    }
+
+    const filtro = {};
     if (fecha) filtro.fecha = fecha;
     if (recinto) filtro.recinto = recinto;
     if (clase) filtro.clase = clase;
-    if (estado && ESTADOS_RESERVA.includes(estado)) {
-      filtro.estado = estado;
-    }
+    if (estado) filtro.estado = estado;
 
     const consulta = Reserva.find(filtro);
     let reservas = await poblarReservas(consulta);
@@ -469,6 +600,10 @@ async function confirmarReservaCoordinador(req, res) {
       return res
         .status(409)
         .json({ mensaje: 'No se puede confirmar una reserva cancelada' });
+    }
+
+    if (reserva.estado === 'confirmada') {
+      return res.json(reserva);
     }
 
     if (reserva.estado !== 'pendiente') {
@@ -543,61 +678,175 @@ async function reasignarReservaAdmin(req, res) {
     }
 
     const bloqueAnteriorId = reserva.bloque?._id || reserva.bloque;
-    let bloqueDestinoId = nuevoBloqueId || bloqueAnteriorId;
+    const bloqueDestinoId = nuevoBloqueId || bloqueAnteriorId;
     const fechaDestino = nuevaFecha ? String(nuevaFecha).trim() : reserva.fecha;
 
-    if (!FECHA_REGEX.test(fechaDestino)) {
+    if (!bloqueDestinoId) {
+      return res.status(400).json({ mensaje: 'El bloque de destino es obligatorio' });
+    }
+    if (!esFechaCalendarioValida(fechaDestino)) {
       return res.status(400).json({ mensaje: 'El formato de fecha debe ser YYYY-MM-DD' });
     }
-
-    const bloqueDestino = await BloqueDisponibilidad.findById(bloqueDestinoId);
-    if (!bloqueDestino) {
-      return res.status(404).json({ mensaje: 'El bloque de destino no existe' });
+    if (!esFechaFutura(fechaDestino)) {
+      return res.status(400).json({ mensaje: 'La fecha debe ser futura o el día de hoy' });
     }
 
-    // Si cambia de bloque o de fecha, verificar disponibilidad en el destino
-    if (
-      String(bloqueDestinoId) !== String(bloqueAnteriorId) ||
-      fechaDestino !== reserva.fecha
-    ) {
-      const ocupadosDestino = await Reserva.countDocuments({
-        bloque: bloqueDestino._id || bloqueDestinoId,
-        fecha: fechaDestino,
-        estado: { $in: ['pendiente', 'confirmada'] },
-      });
+    let resultado;
+    try {
+      resultado = await ejecutarConBloqueo(`${bloqueDestinoId}:${fechaDestino}`, async () =>
+        ejecutarEnTransaccion(async (session) => {
+          try {
+            const bloqueDestino = await conSesion(
+              BloqueDisponibilidad.findById(bloqueDestinoId),
+              session
+            );
+            if (!bloqueDestino) {
+              return { status: 404, body: { mensaje: 'El bloque de destino no existe' } };
+            }
 
-      if (Number(ocupadosDestino) >= Number(bloqueDestino.capacidad)) {
-        return res
-          .status(409)
-          .json({ mensaje: 'El bloque de destino no tiene cupos disponibles' });
-      }
+            const recintoId = bloqueDestino.recinto?._id || bloqueDestino.recinto;
+            if (recintoId) {
+              const recintoDoc = await conSesion(Recinto.findById(recintoId), session);
+              if (recintoDoc && recintoDoc.activo === false) {
+                return {
+                  status: 400,
+                  body: { mensaje: 'El recinto de destino no está disponible' },
+                };
+              }
+            }
+
+            if (bloqueDestino.clase) {
+              const claseId = bloqueDestino.clase?._id || bloqueDestino.clase;
+              const claseDoc = await conSesion(Clase.findById(claseId), session);
+              if (claseDoc && claseDoc.activa === false) {
+                return {
+                  status: 400,
+                  body: { mensaje: 'La clase de destino no está disponible' },
+                };
+              }
+            }
+
+            const hayCambioHorario =
+              String(bloqueDestinoId) !== String(bloqueAnteriorId) ||
+              fechaDestino !== reserva.fecha;
+            const diaFecha = obtenerDiaSemanaDeFecha(fechaDestino);
+            if (
+              hayCambioHorario &&
+              bloqueDestino.diaSemana !== undefined &&
+              diaFecha !== null &&
+              Number(bloqueDestino.diaSemana) !== diaFecha
+            ) {
+              return {
+                status: 400,
+                body: {
+                  mensaje: 'La fecha no corresponde al día de la semana del bloque de destino',
+                },
+              };
+            }
+
+            if (hayCambioHorario) {
+              const ocupadosDestino = await Reserva.countDocuments(
+                {
+                  bloque: bloqueDestino._id || bloqueDestinoId,
+                  fecha: fechaDestino,
+                  estado: { $in: ['pendiente', 'confirmada'] },
+                },
+                opcionesSesion(session)
+              );
+
+              if (Number(ocupadosDestino) >= Number(bloqueDestino.capacidad)) {
+                return {
+                  status: 409,
+                  body: { mensaje: 'El bloque de destino no tiene cupos disponibles' },
+                };
+              }
+            }
+
+            if (nuevoClienteId) {
+              const nuevoCliente = await conSesion(User.findById(nuevoClienteId), session);
+              if (!nuevoCliente) {
+                return { status: 404, body: { mensaje: 'El cliente de destino no existe' } };
+              }
+              if (nuevoCliente.activo === false) {
+                return {
+                  status: 400,
+                  body: { mensaje: 'El cliente de destino no está activo' },
+                };
+              }
+            }
+
+            const clienteFinal =
+              nuevoClienteId || reserva.cliente?._id || reserva.cliente;
+            const duplicada = await conSesion(
+              Reserva.findOne({
+                bloque: bloqueDestino._id || bloqueDestinoId,
+                fecha: fechaDestino,
+                cliente: clienteFinal,
+                estado: { $in: ['pendiente', 'confirmada'] },
+                _id: { $ne: reserva._id },
+              }),
+              session
+            );
+            if (duplicada) {
+              return {
+                status: 409,
+                body: {
+                  mensaje: 'El cliente ya posee una reserva activa en el bloque y fecha de destino',
+                },
+              };
+            }
+
+            const estadoAnterior = reserva.estado;
+            const bloqueAnterior = bloqueAnteriorId;
+            const fechaAnterior = reserva.fecha;
+
+            reserva.bloque = bloqueDestino._id || bloqueDestinoId;
+            reserva.recinto = recintoId || reserva.recinto;
+            reserva.clase = bloqueDestino.clase?._id || bloqueDestino.clase || reserva.clase;
+            reserva.fecha = fechaDestino;
+            if (nuevoClienteId) reserva.cliente = nuevoClienteId;
+            reserva.gestionadoPor = req.user.id;
+
+            if (Array.isArray(reserva.historialCambios)) {
+              reserva.historialCambios.push({
+                usuario: req.user.id,
+                rol: req.user.rol,
+                fecha: new Date(),
+                resumen: `De bloque ${bloqueAnterior} / ${fechaAnterior} (${estadoAnterior}) a bloque ${bloqueDestinoId} / ${fechaDestino}`,
+              });
+            }
+
+            if (typeof reserva.save === 'function') {
+              await reserva.save(opcionesSesion(session));
+            }
+
+            await sincronizarContadorBloque(bloqueAnteriorId, session);
+            if (String(bloqueDestinoId) !== String(bloqueAnteriorId)) {
+              await sincronizarContadorBloque(bloqueDestinoId, session);
+            }
+
+            return { status: 200, body: reserva };
+          } catch (err) {
+            console.error('Error al reasignar la reserva:', err.message, err.code);
+            if (err.code === 11000) {
+              return {
+                status: 409,
+                body: {
+                  mensaje: 'El cliente ya posee una reserva activa en el bloque y fecha de destino',
+                },
+              };
+            }
+            return { status: 500, body: { mensaje: 'Error al reasignar la reserva' } };
+          }
+        })
+      );
+    } catch (err) {
+      console.error('Error al reasignar la reserva:', err.message, err.code);
+      return res.status(500).json({ mensaje: 'Error al reasignar la reserva' });
     }
 
-    reserva.bloque = bloqueDestino._id || bloqueDestinoId;
-    reserva.recinto = bloqueDestino.recinto?._id || bloqueDestino.recinto || reserva.recinto;
-    reserva.clase = bloqueDestino.clase?._id || bloqueDestino.clase || reserva.clase;
-    reserva.fecha = fechaDestino;
-    if (nuevoClienteId) {
-      reserva.cliente = nuevoClienteId;
-    }
-    reserva.gestionadoPor = req.user.id;
-
-    if (typeof reserva.save === 'function') {
-      await reserva.save();
-    }
-
-    await sincronizarContadorBloque(bloqueAnteriorId);
-    if (String(bloqueDestinoId) !== String(bloqueAnteriorId)) {
-      await sincronizarContadorBloque(bloqueDestinoId);
-    }
-
-    return res.json(reserva);
+    return res.status(resultado.status).json(resultado.body);
   } catch (err) {
-    if (err.code === 11000) {
-      return res.status(409).json({
-        mensaje: 'El cliente ya posee una reserva activa en el bloque y fecha de destino',
-      });
-    }
     return res.status(500).json({ mensaje: 'Error al reasignar la reserva' });
   }
 }
@@ -608,6 +857,13 @@ async function reasignarReservaAdmin(req, res) {
 async function conteoReservasPorInstructor(req, res) {
   try {
     const { fecha } = req.query || {};
+    if (fecha && !esFechaCalendarioValida(fecha)) {
+      return res.status(400).json({ mensaje: 'El formato de fecha debe ser YYYY-MM-DD' });
+    }
+    if (fecha && !esFechaFutura(fecha)) {
+      return res.status(400).json({ mensaje: 'La fecha debe ser futura o el día de hoy' });
+    }
+
     const filtroBloques = {};
 
     if (req.user.rol === 'instructor') {

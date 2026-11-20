@@ -41,7 +41,28 @@ function proximaFechaParaDia(diaSemanaObjetivo) {
   return '';
 }
 
+function construirFechaHoraLocal(fecha, hora = '00:00') {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(fecha || ''))) return null;
+  const [anio, mes, dia] = String(fecha).split('-').map(Number);
+  const [horas, minutos] = String(hora || '00:00').split(':').map(Number);
+  if (Number.isNaN(horas) || Number.isNaN(minutos)) return null;
+  return new Date(anio, mes - 1, dia, horas, minutos, 0, 0);
+}
+
 const REGISTROS_POR_PAGINA = 5;
+
+function paginar(lista, pagina) {
+  const totalPaginas = Math.max(1, Math.ceil(lista.length / REGISTROS_POR_PAGINA));
+  const paginaActual = Math.min(Math.max(1, pagina), totalPaginas);
+  return {
+    totalPaginas,
+    paginaActual,
+    registros: lista.slice(
+      (paginaActual - 1) * REGISTROS_POR_PAGINA,
+      paginaActual * REGISTROS_POR_PAGINA
+    ),
+  };
+}
 
 function Paginacion({ etiqueta, pagina, totalPaginas, totalRegistros, onCambiar }) {
   return (
@@ -148,7 +169,7 @@ export default function Dashboard({ usuario, onSalir }) {
   const [formUsuario, setFormUsuario] = useState({
     correo: '',
     password: '',
-    rol: 'instructor',
+    rol: 'cliente',
   });
 
   // Estado para formulario de Clases (HU06 - Instructor)
@@ -179,12 +200,16 @@ export default function Dashboard({ usuario, onSalir }) {
   const [filtroDispFecha, setFiltroDispFecha] = useState('');
   const [filtroDispRecinto, setFiltroDispRecinto] = useState('');
   const [filtroDispClase, setFiltroDispClase] = useState('');
+  const [filtroDispInstructor, setFiltroDispInstructor] = useState('');
   const [filtroTipoMisReservas, setFiltroTipoMisReservas] = useState('todas');
 
   // Filtros del Panel de Reservas para Coordinador y Administrador (HU15 - HU17, ST03.07)
   const [filtroResFecha, setFiltroResFecha] = useState('');
   const [filtroResRecinto, setFiltroResRecinto] = useState('');
+  const [filtroResClase, setFiltroResClase] = useState('');
+  const [filtroResInstructor, setFiltroResInstructor] = useState('');
   const [filtroResEstado, setFiltroResEstado] = useState('');
+  const [filtroConteoFecha, setFiltroConteoFecha] = useState('');
   const [motivoCancelacionCoord, setMotivoCancelacionCoord] = useState('');
 
   // Formulario de Reasignación de Reserva exclusiva del Administrador (ST03.10)
@@ -192,16 +217,43 @@ export default function Dashboard({ usuario, onSalir }) {
     reservaId: null,
     nuevoBloqueId: '',
     nuevaFecha: '',
+    nuevoClienteId: '',
   });
 
-  // Navegación y paginación del panel administrador
+  // Navegación y paginación
   const [vistaAdmin, setVistaAdmin] = useState('recintos');
+  const [vistaCoordinador, setVistaCoordinador] = useState('reservas');
   const [paginaRecintos, setPaginaRecintos] = useState(1);
   const [paginaUsuarios, setPaginaUsuarios] = useState(1);
+  const [paginaDisponibilidad, setPaginaDisponibilidad] = useState(1);
+  const [paginaMisReservas, setPaginaMisReservas] = useState(1);
+  const [paginaTodasReservas, setPaginaTodasReservas] = useState(1);
+  const [paginaBloques, setPaginaBloques] = useState(1);
+  const [paginaClasesInstructor, setPaginaClasesInstructor] = useState(1);
+  const [paginaBloquesInstructor, setPaginaBloquesInstructor] = useState(1);
+  const [paginaConteoInstructor, setPaginaConteoInstructor] = useState(1);
+  const [vistaInstructor, setVistaInstructor] = useState('clases');
+  const [accionEnCurso, setAccionEnCurso] = useState(false);
 
   function limpiarAvisos() {
     setMensajeExito('');
     setMensajeError('');
+  }
+
+  function reportarErrorCarga(contexto, err) {
+    setMensajeError(
+      `${contexto}: ${err.errores?.join(' · ') || err.message || 'Error desconocido'}`
+    );
+  }
+
+  function mensajeErrorAccion(err, fallback) {
+    return err.errores?.join(' · ') || err.message || fallback;
+  }
+
+  function puedeConfirmarReserva(reserva) {
+    const inicio = construirFechaHoraLocal(reserva.fecha, reserva.bloque?.horaInicio);
+    if (!inicio) return false;
+    return inicio.getTime() - Date.now() >= 60 * 60 * 1000;
   }
 
   async function cargarDatos() {
@@ -229,16 +281,26 @@ export default function Dashboard({ usuario, onSalir }) {
               fecha: filtroDispFecha,
               recinto: filtroDispRecinto,
               clase: filtroDispClase,
+              instructor: filtroDispInstructor,
             })
-            .catch(() => []),
-          reservasApi.mias(filtroTipoMisReservas).catch(() => []),
+            .catch((err) => {
+              reportarErrorCarga('No se pudo consultar la disponibilidad', err);
+              return [];
+            }),
+          reservasApi.mias(filtroTipoMisReservas).catch((err) => {
+            reportarErrorCarga('No se pudieron cargar tus reservas', err);
+            return [];
+          }),
         ]);
         setDisponibilidad(Array.isArray(disp) ? disp : []);
         setMisReservas(Array.isArray(mias) ? mias : []);
       }
 
       if (esInstructor) {
-        const conteo = await reservasApi.conteoInstructor().catch(() => []);
+        const conteo = await reservasApi.conteoInstructor({ fecha: filtroConteoFecha }).catch((err) => {
+          reportarErrorCarga('No se pudo cargar el conteo de reservas', err);
+          return [];
+        });
         setConteosInstructor(Array.isArray(conteo) ? conteo : []);
       }
 
@@ -247,18 +309,26 @@ export default function Dashboard({ usuario, onSalir }) {
           .listarTodas({
             fecha: filtroResFecha,
             recinto: filtroResRecinto,
+            clase: filtroResClase,
+            instructor: filtroResInstructor,
             estado: filtroResEstado,
           })
-          .catch(() => []);
+          .catch((err) => {
+            reportarErrorCarga('No se pudieron cargar las reservas del sistema', err);
+            return [];
+          });
         setTodasReservas(Array.isArray(reservasSistema) ? reservasSistema : []);
       }
 
       if (esAdmin) {
-        const listaUsuarios = await usuariosApi.listar().catch(() => []);
+        const listaUsuarios = await usuariosApi.listar().catch((err) => {
+          reportarErrorCarga('No se pudo cargar la lista de usuarios', err);
+          return [];
+        });
         setUsuarios(Array.isArray(listaUsuarios) ? listaUsuarios : []);
       }
     } catch (err) {
-      setMensajeError(err.message || 'Error al cargar los datos del panel');
+      reportarErrorCarga('No se pudo cargar el panel', err);
     } finally {
       setCargando(false);
     }
@@ -271,13 +341,24 @@ export default function Dashboard({ usuario, onSalir }) {
     filtroDispFecha,
     filtroDispRecinto,
     filtroDispClase,
+    filtroDispInstructor,
     filtroTipoMisReservas,
     filtroResFecha,
     filtroResRecinto,
+    filtroResClase,
+    filtroResInstructor,
     filtroResEstado,
+    filtroConteoFecha,
   ]);
 
   const recintosActivos = recintos.filter((r) => r.activo !== false);
+  const recintoSeleccionado = recintos.find(
+    (r) => String(r._id) === String(formBloque.recinto)
+  );
+  const excedeCapacidadRecinto = Boolean(
+    recintoSeleccionado &&
+      Number(formBloque.capacidad) > Number(recintoSeleccionado.capacidad)
+  );
 
   const totalPaginasRecintos = Math.max(
     1,
@@ -298,6 +379,13 @@ export default function Dashboard({ usuario, onSalir }) {
     (paginaUsuariosActual - 1) * REGISTROS_POR_PAGINA,
     paginaUsuariosActual * REGISTROS_POR_PAGINA
   );
+
+  const dispPaginada = paginar(disponibilidad, paginaDisponibilidad);
+  const misReservasPaginadas = paginar(misReservas, paginaMisReservas);
+  const todasReservasPaginadas = paginar(todasReservas, paginaTodasReservas);
+  const clasesInstructorPaginadas = paginar(clases, paginaClasesInstructor);
+  const bloquesInstructorPaginados = paginar(bloques, paginaBloquesInstructor);
+  const conteosInstructorPaginados = paginar(conteosInstructor, paginaConteoInstructor);
 
   // ===========================================================================
   // Acciones Administrador: Recintos (HU04, HU05, ST02.03) y Usuarios (HU03)
@@ -345,7 +433,7 @@ export default function Dashboard({ usuario, onSalir }) {
     try {
       await usuariosApi.crear(formUsuario);
       setMensajeExito(`Cuenta creada para ${formUsuario.correo} con rol ${formUsuario.rol}.`);
-      setFormUsuario({ correo: '', password: '', rol: 'instructor' });
+      setFormUsuario({ correo: '', password: '', rol: 'cliente' });
       await cargarDatos();
     } catch (err) {
       setMensajeError(err.errores?.join(' · ') || err.message);
@@ -384,6 +472,12 @@ export default function Dashboard({ usuario, onSalir }) {
   async function guardarBloque(e) {
     e.preventDefault();
     limpiarAvisos();
+    if (excedeCapacidadRecinto) {
+      setMensajeError(
+        `La capacidad no puede superar la del recinto (${recintoSeleccionado.capacidad} clientes).`
+      );
+      return;
+    }
     try {
       const payload = {
         clase: formBloque.clase,
@@ -445,6 +539,7 @@ export default function Dashboard({ usuario, onSalir }) {
   // ===========================================================================
   async function reservarCupoCliente(itemDisp) {
     limpiarAvisos();
+    setAccionEnCurso(true);
     try {
       const fechaObjetivo =
         filtroDispFecha || itemDisp.fecha || proximaFechaParaDia(itemDisp.diaSemana);
@@ -457,68 +552,89 @@ export default function Dashboard({ usuario, onSalir }) {
       );
       await cargarDatos();
     } catch (err) {
-      setMensajeError(err.message);
+      setMensajeError(mensajeErrorAccion(err, 'No se pudo crear la reserva'));
+    } finally {
+      setAccionEnCurso(false);
     }
   }
 
   async function confirmarMiReserva(id) {
     limpiarAvisos();
+    setAccionEnCurso(true);
     try {
       await reservasApi.confirmarAsistencia(id);
       setMensajeExito('Asistencia confirmada correctamente.');
       await cargarDatos();
     } catch (err) {
-      setMensajeError(err.message);
+      setMensajeError(mensajeErrorAccion(err, 'No se pudo confirmar la asistencia'));
+    } finally {
+      setAccionEnCurso(false);
     }
   }
 
   async function cancelarMiReserva(id) {
     limpiarAvisos();
+    setAccionEnCurso(true);
     try {
       await reservasApi.cancelarPropia(id);
       setMensajeExito('Reserva cancelada. Tu cupo ha sido liberado.');
       await cargarDatos();
     } catch (err) {
-      setMensajeError(err.message);
+      setMensajeError(mensajeErrorAccion(err, 'No se pudo cancelar la reserva'));
+    } finally {
+      setAccionEnCurso(false);
     }
   }
 
   async function confirmarPorCoordinador(id) {
     limpiarAvisos();
+    setAccionEnCurso(true);
     try {
       await reservasApi.confirmarCoordinador(id);
       setMensajeExito('Reserva confirmada por coordinación.');
       await cargarDatos();
     } catch (err) {
-      setMensajeError(err.message);
+      setMensajeError(mensajeErrorAccion(err, 'No se pudo confirmar la reserva'));
+    } finally {
+      setAccionEnCurso(false);
     }
   }
 
   async function cancelarPorCoordinador(id) {
     limpiarAvisos();
+    setAccionEnCurso(true);
     try {
       await reservasApi.cancelarCoordinador(id, motivoCancelacionCoord);
       setMensajeExito('Reserva cancelada y cupo liberado para otros clientes.');
       setMotivoCancelacionCoord('');
       await cargarDatos();
     } catch (err) {
-      setMensajeError(err.message);
+      setMensajeError(mensajeErrorAccion(err, 'No se pudo cancelar la reserva'));
+    } finally {
+      setAccionEnCurso(false);
     }
   }
 
   async function guardarReasignacionAdmin(e) {
     e.preventDefault();
     limpiarAvisos();
+    setAccionEnCurso(true);
     try {
-      await reservasApi.reasignarAdmin(formReasignar.reservaId, {
+      const payload = {
         nuevoBloqueId: formReasignar.nuevoBloqueId,
         nuevaFecha: formReasignar.nuevaFecha,
-      });
+      };
+      if (formReasignar.nuevoClienteId) {
+        payload.nuevoClienteId = formReasignar.nuevoClienteId;
+      }
+      await reservasApi.reasignarAdmin(formReasignar.reservaId, payload);
       setMensajeExito('Reserva reasignada exitosamente por el administrador.');
-      setFormReasignar({ reservaId: null, nuevoBloqueId: '', nuevaFecha: '' });
+      setFormReasignar({ reservaId: null, nuevoBloqueId: '', nuevaFecha: '', nuevoClienteId: '' });
       await cargarDatos();
     } catch (err) {
-      setMensajeError(err.message);
+      setMensajeError(mensajeErrorAccion(err, 'No se pudo reasignar la reserva'));
+    } finally {
+      setAccionEnCurso(false);
     }
   }
 
@@ -528,6 +644,20 @@ export default function Dashboard({ usuario, onSalir }) {
     if (filtroDia !== '' && Number(b.diaSemana) !== Number(filtroDia)) return false;
     return true;
   });
+  const bloquesPaginados = paginar(bloquesFiltrados, paginaBloques);
+
+  const instructoresDisponibles = [
+    ...new Map(
+      [...disponibilidad, ...bloques, ...clases]
+        .filter((item) => item?.instructor)
+        .map((item) => {
+          const instructor = item.instructor;
+          const id = instructor._id || instructor;
+          return [String(id), { _id: id, correo: instructor.correo || 'Instructor' }];
+        })
+    ).values(),
+  ];
+  const clientesParaReasignar = usuarios.filter((u) => u.rol === 'cliente');
 
   return (
     <main className="min-h-screen bg-[#f7faff] text-[#10233f]">
@@ -622,7 +752,7 @@ export default function Dashboard({ usuario, onSalir }) {
                           Horarios Disponibles con Cupos Libres (HU10 · HU11)
                         </h2>
                         <p className="mt-1 text-xs text-slate-400">
-                          Filtra por fecha, recinto activo o clase y solicita tu cupo en línea.
+                          Filtra por fecha, recinto activo, clase o instructor y solicita tu cupo en línea.
                         </p>
                       </div>
 
@@ -657,13 +787,30 @@ export default function Dashboard({ usuario, onSalir }) {
                             </option>
                           ))}
                         </select>
-                        {(filtroDispFecha || filtroDispRecinto || filtroDispClase) && (
+                        <select
+                          aria-label="Filtrar por instructor"
+                          value={filtroDispInstructor}
+                          onChange={(e) => setFiltroDispInstructor(e.target.value)}
+                          className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold"
+                        >
+                          <option value="">Todos los instructores</option>
+                          {instructoresDisponibles.map((i) => (
+                            <option key={i._id || i} value={i._id || i}>
+                              {i.correo || 'Instructor'}
+                            </option>
+                          ))}
+                        </select>
+                        {(filtroDispFecha ||
+                          filtroDispRecinto ||
+                          filtroDispClase ||
+                          filtroDispInstructor) && (
                           <button
                             type="button"
                             onClick={() => {
                               setFiltroDispFecha('');
                               setFiltroDispRecinto('');
                               setFiltroDispClase('');
+                              setFiltroDispInstructor('');
                             }}
                             className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-50"
                           >
@@ -679,7 +826,7 @@ export default function Dashboard({ usuario, onSalir }) {
                       </p>
                     ) : (
                       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        {disponibilidad.map((item) => {
+                        {dispPaginada.registros.map((item) => {
                           const fechaReserva =
                             filtroDispFecha ||
                             item.fecha ||
@@ -715,15 +862,23 @@ export default function Dashboard({ usuario, onSalir }) {
                               <button
                                 type="button"
                                 onClick={() => reservarCupoCliente(item)}
-                                className="primary-button mt-4 w-full !py-2.5 text-xs"
+                                disabled={accionEnCurso}
+                                className="primary-button mt-4 w-full !py-2.5 text-xs disabled:cursor-not-allowed disabled:opacity-50"
                               >
-                                Reservar cupo
+                                {accionEnCurso ? 'Reservando...' : 'Reservar cupo'}
                               </button>
                             </article>
                           );
                         })}
                       </div>
                     )}
+                    <Paginacion
+                      etiqueta="Disponibilidad"
+                      pagina={dispPaginada.paginaActual}
+                      totalPaginas={dispPaginada.totalPaginas}
+                      totalRegistros={disponibilidad.length}
+                      onCambiar={setPaginaDisponibilidad}
+                    />
                   </div>
                 )}
 
@@ -779,7 +934,7 @@ export default function Dashboard({ usuario, onSalir }) {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
-                            {misReservas.map((r) => (
+                            {misReservasPaginadas.registros.map((r) => (
                               <tr key={r._id}>
                                 <td className="py-3 pr-4 font-bold">
                                   {r.fecha} · {r.bloque?.horaInicio || '--:--'} –{' '}
@@ -800,7 +955,13 @@ export default function Dashboard({ usuario, onSalir }) {
                                         <button
                                           type="button"
                                           onClick={() => confirmarMiReserva(r._id)}
-                                          className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 hover:bg-emerald-100"
+                                          disabled={accionEnCurso || !puedeConfirmarReserva(r)}
+                                          title={
+                                            puedeConfirmarReserva(r)
+                                              ? 'Puedes confirmar hasta 1 hora antes del inicio'
+                                              : 'La confirmación solo está disponible hasta 1 hora antes del inicio'
+                                          }
+                                          className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-40"
                                         >
                                           Confirmar asistencia
                                         </button>
@@ -808,7 +969,8 @@ export default function Dashboard({ usuario, onSalir }) {
                                       <button
                                         type="button"
                                         onClick={() => cancelarMiReserva(r._id)}
-                                        className="rounded-lg border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
+                                        disabled={accionEnCurso}
+                                        className="rounded-lg border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
                                       >
                                         Cancelar cupo
                                       </button>
@@ -821,6 +983,13 @@ export default function Dashboard({ usuario, onSalir }) {
                         </table>
                       </div>
                     )}
+                    <Paginacion
+                      etiqueta="Mis reservas"
+                      pagina={misReservasPaginadas.paginaActual}
+                      totalPaginas={misReservasPaginadas.totalPaginas}
+                      totalRegistros={misReservas.length}
+                      onCambiar={setPaginaMisReservas}
+                    />
                   </div>
                 )}
               </div>
@@ -1026,12 +1195,12 @@ export default function Dashboard({ usuario, onSalir }) {
                   <div className="space-y-6">
                     {/* Creación de Usuarios e Instructores (HU03 / ST01.07) */}
                     <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
-                      <h2 className="text-xl font-bold">
-                        Crear Usuario o Instructor (HU03)
-                      </h2>
-                      <p className="mt-1 text-xs text-slate-400">
-                        Asigna cuentas con rol instructor, coordinador, cliente o administrador.
-                      </p>
+                        <h2 className="text-xl font-bold">
+                          Crear Usuario (HU03)
+                        </h2>
+                        <p className="mt-1 text-xs text-slate-400">
+                          Selecciona Cliente para que la cuenta pueda reservar. El rol instructor coordina horarios y no reserva cupos.
+                        </p>
 
                       <form onSubmit={guardarNuevoUsuario} className="mt-4 space-y-3">
                         <div>
@@ -1073,9 +1242,9 @@ export default function Dashboard({ usuario, onSalir }) {
                               }
                               className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
                             >
+                              <option value="cliente">Cliente (puede reservar)</option>
                               <option value="instructor">Instructor</option>
                               <option value="coordinador">Coordinador</option>
-                              <option value="cliente">Cliente</option>
                               <option value="administrador">Administrador</option>
                             </select>
                           </div>
@@ -1130,297 +1299,457 @@ export default function Dashboard({ usuario, onSalir }) {
                 VISTA INSTRUCTOR: Clases (HU06), Bloques (HU07/HU08) y Conteo (ST03.09)
             =============================================================== */}
             {usuario?.rol === 'instructor' && (
-              <div className="space-y-8">
-                <div className="grid gap-8 lg:grid-cols-2">
-                  {/* Mis Clases (HU06) */}
-                  <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
-                    <h2 className="text-xl font-bold">
-                      {formClase.id ? 'Editar Mi Clase (HU06)' : 'Crear Nueva Clase (HU06)'}
-                    </h2>
-                    <p className="mt-1 text-xs text-slate-400">
-                      Solo se pueden asociar clases a recintos activos.
-                    </p>
+              <div className="space-y-6">
+                <div className="flex flex-wrap items-center gap-2 rounded-[22px] border border-slate-200 bg-white p-2 shadow-sm">
+                  {[
+                    { clave: 'clases', etiqueta: `Mis clases (${clases.length})` },
+                    { clave: 'bloques', etiqueta: `Mis bloques (${bloques.length})` },
+                    { clave: 'conteo', etiqueta: `Conteo (${conteosInstructor.length})` },
+                  ].map((tab) => (
+                    <button
+                      key={tab.clave}
+                      type="button"
+                      onClick={() => setVistaInstructor(tab.clave)}
+                      className={`rounded-xl px-4 py-2 text-sm font-bold transition ${
+                        vistaInstructor === tab.clave
+                          ? 'bg-[#1268e8] text-white shadow-sm'
+                          : 'text-slate-500 hover:bg-slate-50'
+                      }`}
+                    >
+                      {tab.etiqueta}
+                    </button>
+                  ))}
+                </div>
 
-                    <form onSubmit={guardarClase} className="mt-4 space-y-3">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600">
-                          Nombre de la clase
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={formClase.nombre}
-                          onChange={(e) => setFormClase({ ...formClase, nombre: e.target.value })}
-                          placeholder="Ej. Entrenamiento funcional"
-                          className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600">
-                          Tipo de rutina
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={formClase.tipoRutina}
-                          onChange={(e) =>
-                            setFormClase({ ...formClase, tipoRutina: e.target.value })
-                          }
-                          placeholder="Ej. Fuerza y cardio"
-                          className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600">
-                          Recinto activo
-                        </label>
-                        <select
-                          required
-                          value={formClase.recinto}
-                          onChange={(e) =>
-                            setFormClase({ ...formClase, recinto: e.target.value })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
-                        >
-                          <option value="">Selecciona un recinto activo...</option>
-                          {recintosActivos.map((r) => (
-                            <option key={r._id} value={r._id}>
-                              {r.nombre} ({r.tipo} · Cap: {r.capacidad})
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <button type="submit" className="primary-button !py-2.5 text-sm">
-                        {formClase.id ? 'Actualizar clase' : 'Crear clase'}
-                      </button>
-                    </form>
+                {vistaInstructor === 'clases' && (
+                  <div className="grid gap-6 lg:grid-cols-2">
+                    <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
+                      <h2 className="text-xl font-bold">
+                        {formClase.id ? 'Editar Mi Clase (HU06)' : 'Crear Nueva Clase (HU06)'}
+                      </h2>
+                      <p className="mt-1 text-xs text-slate-400">
+                        Solo se pueden asociar clases a recintos activos.
+                      </p>
 
-                    <div className="mt-6 divide-y divide-slate-100">
-                      {clases.map((c) => (
-                        <div
-                          key={c._id}
-                          className="flex items-center justify-between py-3 text-sm"
-                        >
-                          <div>
-                            <p className="font-bold">{c.nombre}</p>
-                            <p className="text-xs text-slate-500">
-                              Rutina: {c.tipoRutina} · Recinto:{' '}
-                              {c.recinto?.nombre || 'Asignado'}
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setFormClase({
-                                id: c._id,
-                                nombre: c.nombre,
-                                tipoRutina: c.tipoRutina,
-                                recinto: c.recinto?._id || c.recinto || '',
-                              })
-                            }
-                            className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold hover:bg-slate-50"
-                          >
-                            Editar
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Publicar / Actualizar Bloques de Disponibilidad (HU07, HU08, ST02.08) */}
-                  <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
-                    <h2 className="text-xl font-bold">
-                      {formBloque.id
-                        ? 'Actualizar Bloque de Horario (HU08)'
-                        : 'Publicar Bloque de Disponibilidad (HU07)'}
-                    </h2>
-                    <p className="mt-1 text-xs text-slate-400">
-                      Valida automáticamente que la hora fin sea posterior al inicio y que no haya solapamientos.
-                    </p>
-
-                    <form onSubmit={guardarBloque} className="mt-4 space-y-3">
-                      <div className="grid grid-cols-2 gap-3">
+                      <form onSubmit={guardarClase} className="mt-4 space-y-3">
                         <div>
-                          <label className="block text-xs font-bold text-slate-600">Clase</label>
-                          <select
+                          <label className="block text-xs font-bold text-slate-600">
+                            Nombre de la clase
+                          </label>
+                          <input
+                            type="text"
                             required
-                            value={formBloque.clase}
-                            onChange={(e) => {
-                              const cl = clases.find((x) => x._id === e.target.value);
-                              setFormBloque({
-                                ...formBloque,
-                                clase: e.target.value,
-                                recinto: cl?.recinto?._id || cl?.recinto || formBloque.recinto,
-                              });
-                            }}
+                            value={formClase.nombre}
+                            onChange={(e) => setFormClase({ ...formClase, nombre: e.target.value })}
+                            placeholder="Ej. Entrenamiento funcional"
                             className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
-                          >
-                            <option value="">Selecciona clase...</option>
-                            {clases.map((c) => (
-                              <option key={c._id} value={c._id}>
-                                {c.nombre}
-                              </option>
-                            ))}
-                          </select>
+                          />
                         </div>
                         <div>
-                          <label className="block text-xs font-bold text-slate-600">Recinto</label>
-                          <select
+                          <label className="block text-xs font-bold text-slate-600">
+                            Tipo de rutina
+                          </label>
+                          <input
+                            type="text"
                             required
-                            value={formBloque.recinto}
+                            value={formClase.tipoRutina}
                             onChange={(e) =>
-                              setFormBloque({ ...formBloque, recinto: e.target.value })
+                              setFormClase({ ...formClase, tipoRutina: e.target.value })
+                            }
+                            placeholder="Ej. Fuerza y cardio"
+                            className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-600">
+                            Recinto activo
+                          </label>
+                          <select
+                            required
+                            value={formClase.recinto}
+                            onChange={(e) =>
+                              setFormClase({ ...formClase, recinto: e.target.value })
                             }
                             className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
                           >
-                            <option value="">Selecciona recinto...</option>
+                            <option value="">Selecciona un recinto activo...</option>
                             {recintosActivos.map((r) => (
                               <option key={r._id} value={r._id}>
-                                {r.nombre}
+                                {r.nombre} ({r.tipo} · Cap: {r.capacidad})
                               </option>
                             ))}
                           </select>
                         </div>
-                      </div>
-
-                      <div className="grid grid-cols-4 gap-2">
-                        <div>
-                          <label className="block text-xs font-bold text-slate-600">Día</label>
-                          <select
-                            value={formBloque.diaSemana}
-                            onChange={(e) =>
-                              setFormBloque({ ...formBloque, diaSemana: Number(e.target.value) })
-                            }
-                            className="mt-1 w-full rounded-xl border border-slate-200 px-2 py-2 text-sm"
-                          >
-                            {DIAS_SEMANA.map((d) => (
-                              <option key={d.valor} value={d.valor}>
-                                {d.etiqueta}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-slate-600">Inicio</label>
-                          <input
-                            type="time"
-                            required
-                            value={formBloque.horaInicio}
-                            onChange={(e) =>
-                              setFormBloque({ ...formBloque, horaInicio: e.target.value })
-                            }
-                            className="mt-1 w-full rounded-xl border border-slate-200 px-2 py-2 text-sm"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-slate-600">Fin</label>
-                          <input
-                            type="time"
-                            required
-                            value={formBloque.horaFin}
-                            onChange={(e) =>
-                              setFormBloque({ ...formBloque, horaFin: e.target.value })
-                            }
-                            className="mt-1 w-full rounded-xl border border-slate-200 px-2 py-2 text-sm"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-slate-600">Cupos</label>
-                          <input
-                            type="number"
-                            min="1"
-                            required
-                            value={formBloque.capacidad}
-                            onChange={(e) =>
-                              setFormBloque({ ...formBloque, capacidad: e.target.value })
-                            }
-                            className="mt-1 w-full rounded-xl border border-slate-200 px-2 py-2 text-sm"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex gap-2 pt-2">
                         <button type="submit" className="primary-button !py-2.5 text-sm">
-                          {formBloque.id ? 'Guardar bloque' : 'Registrar bloque'}
+                          {formClase.id ? 'Actualizar clase' : 'Crear clase'}
                         </button>
-                        {formBloque.id && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setFormBloque({
-                                id: null,
-                                clase: '',
-                                recinto: '',
-                                diaSemana: 1,
-                                horaInicio: '16:00',
-                                horaFin: '18:00',
-                                capacidad: 12,
-                              })
-                            }
-                            className="secondary-button !py-2.5 text-sm"
-                          >
-                            Cancelar
-                          </button>
-                        )}
-                      </div>
-                    </form>
-                  </div>
-                </div>
-
-                {/* Conteo de Reservas y Confirmadas por Clase y Horario (ST03.09) */}
-                <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
-                  <h2 className="text-xl font-bold">
-                    Conteo de Reservas y Confirmaciones por Clase y Horario (ST03.09)
-                  </h2>
-                  <p className="mt-1 text-xs text-slate-400">
-                    Resumen actualizado de cupos reservados, confirmados y pendientes en cada uno de tus bloques.
-                  </p>
-
-                  {conteosInstructor.length === 0 ? (
-                    <p className="mt-4 text-sm text-slate-400">
-                      Aún no tienes bloques con reservas registradas.
-                    </p>
-                  ) : (
-                    <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                      {conteosInstructor.map((c) => (
-                        <article
-                          key={c.bloqueId}
-                          className="rounded-2xl border border-slate-200 p-4"
-                        >
-                          <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-[#1268e8]">
-                            {nombreDia(c.diaSemana)} · {c.horaInicio} – {c.horaFin}
-                          </span>
-                          <h3 className="mt-2 font-bold">
-                            {c.clase?.nombre || 'Clase'}
-                          </h3>
-                          <p className="text-xs text-slate-500">
-                            Recinto: {c.recinto?.nombre || 'Recinto'}
-                          </p>
-                          <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
-                            <div className="rounded-xl bg-slate-50 p-2">
-                              <span className="block text-base font-extrabold text-slate-800">
-                                {c.totalReservadas}
-                              </span>
-                              Reservadas
-                            </div>
-                            <div className="rounded-xl bg-emerald-50 p-2 text-emerald-700">
-                              <span className="block text-base font-extrabold">
-                                {c.confirmadas}
-                              </span>
-                              Confirmadas
-                            </div>
-                            <div className="rounded-xl bg-amber-50 p-2 text-amber-700">
-                              <span className="block text-base font-extrabold">
-                                {c.pendientes}
-                              </span>
-                              Pendientes
-                            </div>
-                          </div>
-                        </article>
-                      ))}
+                      </form>
                     </div>
-                  )}
-                </div>
+
+                    <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
+                      <h2 className="text-xl font-bold">Mis Clases (HU06)</h2>
+                      <p className="mt-1 text-xs text-slate-400">
+                        Tus clases publicadas, de 5 en 5.
+                      </p>
+                      {clases.length === 0 ? (
+                        <p className="mt-4 text-sm text-slate-400">Aún no registras clases.</p>
+                      ) : (
+                        <>
+                          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                            {clasesInstructorPaginadas.registros.map((c) => (
+                              <article
+                                key={c._id}
+                                className="rounded-2xl border border-slate-200 p-4"
+                              >
+                                <h3 className="font-bold">{c.nombre}</h3>
+                                <p className="mt-1 text-xs text-slate-500">
+                                  Rutina: {c.tipoRutina}
+                                </p>
+                                <p className="text-xs text-slate-500">
+                                  Recinto: {c.recinto?.nombre || 'Asignado'}
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setFormClase({
+                                      id: c._id,
+                                      nombre: c.nombre,
+                                      tipoRutina: c.tipoRutina,
+                                      recinto: c.recinto?._id || c.recinto || '',
+                                    })
+                                  }
+                                  className="mt-3 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold hover:bg-slate-50"
+                                >
+                                  Editar
+                                </button>
+                              </article>
+                            ))}
+                          </div>
+                          <Paginacion
+                            etiqueta="Mis clases"
+                            pagina={clasesInstructorPaginadas.paginaActual}
+                            totalPaginas={clasesInstructorPaginadas.totalPaginas}
+                            totalRegistros={clases.length}
+                            onCambiar={setPaginaClasesInstructor}
+                          />
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {vistaInstructor === 'bloques' && (
+                  <div className="grid gap-6 lg:grid-cols-2">
+                    <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
+                      <h2 className="text-xl font-bold">
+                        {formBloque.id
+                          ? 'Actualizar Bloque de Horario (HU08)'
+                          : 'Publicar Bloque de Disponibilidad (HU07)'}
+                      </h2>
+                      <p className="mt-1 text-xs text-slate-400">
+                        Valida automáticamente que la hora fin sea posterior al inicio y que no haya solapamientos.
+                      </p>
+
+                      <form onSubmit={guardarBloque} className="mt-4 space-y-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-bold text-slate-600">Clase</label>
+                            <select
+                              required
+                              value={formBloque.clase}
+                              onChange={(e) => {
+                                const cl = clases.find((x) => x._id === e.target.value);
+                                setFormBloque({
+                                  ...formBloque,
+                                  clase: e.target.value,
+                                  recinto: cl?.recinto?._id || cl?.recinto || formBloque.recinto,
+                                });
+                              }}
+                              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                            >
+                              <option value="">Selecciona clase...</option>
+                              {clases.map((c) => (
+                                <option key={c._id} value={c._id}>
+                                  {c.nombre}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-slate-600">Recinto</label>
+                            <select
+                              required
+                              value={formBloque.recinto}
+                              onChange={(e) =>
+                                setFormBloque({ ...formBloque, recinto: e.target.value })
+                              }
+                              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                            >
+                              <option value="">Selecciona recinto...</option>
+                              {recintosActivos.map((r) => (
+                                <option key={r._id} value={r._id}>
+                                  {r.nombre}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-4 gap-2">
+                          <div>
+                            <label className="block text-xs font-bold text-slate-600">Día</label>
+                            <select
+                              value={formBloque.diaSemana}
+                              onChange={(e) =>
+                                setFormBloque({ ...formBloque, diaSemana: Number(e.target.value) })
+                              }
+                              className="mt-1 w-full rounded-xl border border-slate-200 px-2 py-2 text-sm"
+                            >
+                              {DIAS_SEMANA.map((d) => (
+                                <option key={d.valor} value={d.valor}>
+                                  {d.etiqueta}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-slate-600">Inicio</label>
+                            <input
+                              type="time"
+                              required
+                              value={formBloque.horaInicio}
+                              onChange={(e) =>
+                                setFormBloque({ ...formBloque, horaInicio: e.target.value })
+                              }
+                              className="mt-1 w-full rounded-xl border border-slate-200 px-2 py-2 text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-slate-600">Fin</label>
+                            <input
+                              type="time"
+                              required
+                              value={formBloque.horaFin}
+                              onChange={(e) =>
+                                setFormBloque({ ...formBloque, horaFin: e.target.value })
+                              }
+                              className="mt-1 w-full rounded-xl border border-slate-200 px-2 py-2 text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-slate-600">Cupos</label>
+                            <input
+                              type="number"
+                              min="1"
+                              max={recintoSeleccionado?.capacidad || undefined}
+                              required
+                              value={formBloque.capacidad}
+                              onChange={(e) =>
+                                setFormBloque({ ...formBloque, capacidad: e.target.value })
+                              }
+                              className="mt-1 w-full rounded-xl border border-slate-200 px-2 py-2 text-sm"
+                            />
+                          </div>
+                        </div>
+
+                        {excedeCapacidadRecinto && (
+                          <p className="text-xs font-semibold text-red-600">
+                            El recinto {recintoSeleccionado.nombre} admite máximo{' '}
+                            {recintoSeleccionado.capacidad} clientes.
+                          </p>
+                        )}
+
+                        <div className="flex gap-2 pt-2">
+                          <button
+                            type="submit"
+                            disabled={excedeCapacidadRecinto}
+                            className="primary-button !py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            {formBloque.id ? 'Guardar bloque' : 'Registrar bloque'}
+                          </button>
+                          {formBloque.id && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setFormBloque({
+                                  id: null,
+                                  clase: '',
+                                  recinto: '',
+                                  diaSemana: 1,
+                                  horaInicio: '16:00',
+                                  horaFin: '18:00',
+                                  capacidad: 12,
+                                })
+                              }
+                              className="secondary-button !py-2.5 text-sm"
+                            >
+                              Cancelar
+                            </button>
+                          )}
+                        </div>
+                      </form>
+                    </div>
+
+                    <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
+                      <h2 className="text-xl font-bold">Mis Bloques (HU07 / HU08)</h2>
+                      <p className="mt-1 text-xs text-slate-400">
+                        Tu disponibilidad publicada, de 5 en 5.
+                      </p>
+                      {bloques.length === 0 ? (
+                        <p className="mt-4 text-sm text-slate-400">Aún no publicas bloques.</p>
+                      ) : (
+                        <>
+                          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                            {bloquesInstructorPaginados.registros.map((b) => (
+                              <article
+                                key={b._id}
+                                className="rounded-2xl border border-slate-200 p-4"
+                              >
+                                <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-[#1268e8]">
+                                  {nombreDia(b.diaSemana)} · {b.horaInicio} – {b.horaFin}
+                                </span>
+                                <h3 className="mt-2 font-bold">
+                                  {b.clase?.nombre || 'Clase'}
+                                </h3>
+                                <p className="text-xs text-slate-500">
+                                  Recinto: {b.recinto?.nombre || 'Recinto'}
+                                </p>
+                                <p className="mt-1 text-xs text-slate-500">
+                                  Capacidad: {b.capacidad} cupos · Activas: {b.reservasActivas || 0}
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={() => seleccionarBloqueParaEditar(b)}
+                                  className="mt-3 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold hover:bg-slate-50"
+                                >
+                                  Editar
+                                </button>
+                              </article>
+                            ))}
+                          </div>
+                          <Paginacion
+                            etiqueta="Mis bloques"
+                            pagina={bloquesInstructorPaginados.paginaActual}
+                            totalPaginas={bloquesInstructorPaginados.totalPaginas}
+                            totalRegistros={bloques.length}
+                            onCambiar={setPaginaBloquesInstructor}
+                          />
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {vistaInstructor === 'conteo' && (
+                  <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
+                    <h2 className="text-xl font-bold">
+                      Conteo de Reservas y Confirmaciones por Clase y Horario (ST03.09)
+                    </h2>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Resumen actualizado de cupos reservados, confirmados y pendientes en cada uno de tus bloques.
+                    </p>
+
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                      <input
+                        aria-label="Filtrar conteo por fecha"
+                        type="date"
+                        value={filtroConteoFecha}
+                        onChange={(e) => setFiltroConteoFecha(e.target.value)}
+                        className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold"
+                      />
+                      {filtroConteoFecha && (
+                        <button
+                          type="button"
+                          onClick={() => setFiltroConteoFecha('')}
+                          className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-50"
+                        >
+                          Limpiar fecha
+                        </button>
+                      )}
+                    </div>
+
+                    {conteosInstructor.length === 0 ? (
+                      <p className="mt-4 text-sm text-slate-400">
+                        Aún no tienes bloques con reservas registradas.
+                      </p>
+                    ) : (
+                      <>
+                        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                          {conteosInstructorPaginados.registros.map((c) => (
+                            <article
+                              key={c.bloqueId}
+                              className="rounded-2xl border border-slate-200 p-4"
+                            >
+                              <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-[#1268e8]">
+                                {nombreDia(c.diaSemana)} · {c.horaInicio} – {c.horaFin}
+                              </span>
+                              <h3 className="mt-2 font-bold">
+                                {c.clase?.nombre || 'Clase'}
+                              </h3>
+                              <p className="text-xs text-slate-500">
+                                Recinto: {c.recinto?.nombre || 'Recinto'}
+                              </p>
+                              <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
+                                <div className="rounded-xl bg-slate-50 p-2">
+                                  <span className="block text-base font-extrabold text-slate-800">
+                                    {c.totalReservadas}
+                                  </span>
+                                  Reservadas
+                                </div>
+                                <div className="rounded-xl bg-emerald-50 p-2 text-emerald-700">
+                                  <span className="block text-base font-extrabold">
+                                    {c.confirmadas}
+                                  </span>
+                                  Confirmadas
+                                </div>
+                                <div className="rounded-xl bg-amber-50 p-2 text-amber-700">
+                                  <span className="block text-base font-extrabold">
+                                    {c.pendientes}
+                                  </span>
+                                  Pendientes
+                                </div>
+                              </div>
+                            </article>
+                          ))}
+                        </div>
+                        <Paginacion
+                          etiqueta="Conteo por bloque"
+                          pagina={conteosInstructorPaginados.paginaActual}
+                          totalPaginas={conteosInstructorPaginados.totalPaginas}
+                          totalRegistros={conteosInstructor.length}
+                          onCambiar={setPaginaConteoInstructor}
+                        />
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {usuario?.rol === 'coordinador' && (
+              <div className="flex flex-wrap items-center gap-2 rounded-[22px] border border-slate-200 bg-white p-2 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setVistaCoordinador('reservas')}
+                  className={`rounded-xl px-4 py-2 text-sm font-bold transition ${
+                    vistaCoordinador === 'reservas'
+                      ? 'bg-[#1268e8] text-white shadow-sm'
+                      : 'text-slate-500 hover:bg-slate-50'
+                  }`}
+                >
+                  Reservas ({todasReservas.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVistaCoordinador('horarios')}
+                  className={`rounded-xl px-4 py-2 text-sm font-bold transition ${
+                    vistaCoordinador === 'horarios'
+                      ? 'bg-[#1268e8] text-white shadow-sm'
+                      : 'text-slate-500 hover:bg-slate-50'
+                  }`}
+                >
+                  Horarios ({bloques.length})
+                </button>
               </div>
             )}
 
@@ -1428,7 +1757,7 @@ export default function Dashboard({ usuario, onSalir }) {
                 PANEL DE CONTROL DE RESERVAS PARA COORDINADOR Y ADMIN
                 (HU15, HU16, HU17, ST03.07, ST03.08, ST03.10)
             =============================================================== */}
-            {(usuario?.rol === 'coordinador' ||
+            {((usuario?.rol === 'coordinador' && vistaCoordinador === 'reservas') ||
               (usuario?.rol === 'administrador' && vistaAdmin === 'reservas')) && (
               <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-4">
@@ -1437,7 +1766,7 @@ export default function Dashboard({ usuario, onSalir }) {
                       Panel de Control de Reservas (HU15 · HU16 · HU17)
                     </h2>
                     <p className="mt-1 text-xs text-slate-400">
-                      Filtra por fecha, recinto y estado para confirmar asistencias o cancelar reservas no confirmadas y liberar cupos.
+                      Filtra por fecha, recinto, clase, instructor o estado para confirmar asistencias o cancelar reservas no confirmadas y liberar cupos.
                     </p>
                   </div>
 
@@ -1461,6 +1790,31 @@ export default function Dashboard({ usuario, onSalir }) {
                       ))}
                     </select>
                     <select
+                      value={filtroResClase}
+                      onChange={(e) => setFiltroResClase(e.target.value)}
+                      className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold"
+                    >
+                      <option value="">Todas las clases</option>
+                      {clases.map((c) => (
+                        <option key={c._id} value={c._id}>
+                          {c.nombre}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      aria-label="Filtrar reservas por instructor"
+                      value={filtroResInstructor}
+                      onChange={(e) => setFiltroResInstructor(e.target.value)}
+                      className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold"
+                    >
+                      <option value="">Todos los instructores</option>
+                      {instructoresDisponibles.map((i) => (
+                        <option key={i._id} value={i._id}>
+                          {i.correo}
+                        </option>
+                      ))}
+                    </select>
+                    <select
                       value={filtroResEstado}
                       onChange={(e) => setFiltroResEstado(e.target.value)}
                       className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold"
@@ -1470,6 +1824,25 @@ export default function Dashboard({ usuario, onSalir }) {
                       <option value="confirmada">Confirmadas</option>
                       <option value="cancelada">Canceladas</option>
                     </select>
+                    {(filtroResFecha ||
+                      filtroResRecinto ||
+                      filtroResClase ||
+                      filtroResInstructor ||
+                      filtroResEstado) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFiltroResFecha('');
+                          setFiltroResRecinto('');
+                          setFiltroResClase('');
+                          setFiltroResInstructor('');
+                          setFiltroResEstado('');
+                        }}
+                        className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-50"
+                      >
+                        Limpiar filtros
+                      </button>
+                    )}
                     <input
                       type="text"
                       value={motivoCancelacionCoord}
@@ -1483,6 +1856,7 @@ export default function Dashboard({ usuario, onSalir }) {
                 {/* Formulario en línea para Reasignación exclusiva de Administrador (ST03.10) */}
                 {usuario?.rol === 'administrador' && formReasignar.reservaId && (
                   <form
+                    id="panel-reasignacion"
                     onSubmit={guardarReasignacionAdmin}
                     className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-blue-200 bg-blue-50/50 p-4"
                   >
@@ -1492,9 +1866,18 @@ export default function Dashboard({ usuario, onSalir }) {
                     <select
                       required
                       value={formReasignar.nuevoBloqueId}
-                      onChange={(e) =>
-                        setFormReasignar({ ...formReasignar, nuevoBloqueId: e.target.value })
-                      }
+                      onChange={(e) => {
+                        const bloque = bloques.find(
+                          (b) => String(b._id) === String(e.target.value)
+                        );
+                        setFormReasignar({
+                          ...formReasignar,
+                          nuevoBloqueId: e.target.value,
+                          nuevaFecha: bloque
+                            ? proximaFechaParaDia(bloque.diaSemana)
+                            : formReasignar.nuevaFecha,
+                        });
+                      }}
                       className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs"
                     >
                       <option value="">Selecciona nuevo bloque...</option>
@@ -1513,13 +1896,37 @@ export default function Dashboard({ usuario, onSalir }) {
                       }
                       className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs"
                     />
-                    <button type="submit" className="primary-button !py-1.5 text-xs">
+                    <select
+                      aria-label="Nuevo cliente para la reasignación"
+                      value={formReasignar.nuevoClienteId}
+                      onChange={(e) =>
+                        setFormReasignar({ ...formReasignar, nuevoClienteId: e.target.value })
+                      }
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs"
+                    >
+                      <option value="">Mismo cliente</option>
+                      {clientesParaReasignar.map((u) => (
+                        <option key={u._id} value={u._id}>
+                          {u.correo}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="submit"
+                      disabled={accionEnCurso}
+                      className="primary-button !py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-50"
+                    >
                       Guardar reasignación
                     </button>
                     <button
                       type="button"
                       onClick={() =>
-                        setFormReasignar({ reservaId: null, nuevoBloqueId: '', nuevaFecha: '' })
+                        setFormReasignar({
+                          reservaId: null,
+                          nuevoBloqueId: '',
+                          nuevaFecha: '',
+                          nuevoClienteId: '',
+                        })
                       }
                       className="secondary-button !py-1.5 text-xs"
                     >
@@ -1546,7 +1953,7 @@ export default function Dashboard({ usuario, onSalir }) {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {todasReservas.map((r) => (
+                        {todasReservasPaginadas.registros.map((r) => (
                           <tr key={r._id}>
                             <td className="py-3 pr-4 font-semibold">
                               {r.cliente?.correo || 'Cliente'}
@@ -1582,7 +1989,8 @@ export default function Dashboard({ usuario, onSalir }) {
                                   <button
                                     type="button"
                                     onClick={() => confirmarPorCoordinador(r._id)}
-                                    className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 hover:bg-emerald-100"
+                                    disabled={accionEnCurso}
+                                    className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-40"
                                   >
                                     Confirmar
                                   </button>
@@ -1591,7 +1999,8 @@ export default function Dashboard({ usuario, onSalir }) {
                                   <button
                                     type="button"
                                     onClick={() => cancelarPorCoordinador(r._id)}
-                                    className="rounded-lg border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
+                                    disabled={accionEnCurso}
+                                    className="rounded-lg border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
                                   >
                                     Cancelar cupo
                                   </button>
@@ -1599,14 +2008,25 @@ export default function Dashboard({ usuario, onSalir }) {
                                 {usuario?.rol === 'administrador' && (
                                   <button
                                     type="button"
-                                    onClick={() =>
+                                    disabled={accionEnCurso}
+                                    onClick={() => {
+                                      const bloqueId = r.bloque?._id || r.bloque || '';
+                                      const bloque = bloques.find(
+                                        (b) => String(b._id) === String(bloqueId)
+                                      );
                                       setFormReasignar({
                                         reservaId: r._id,
-                                        nuevoBloqueId: r.bloque?._id || r.bloque || '',
-                                        nuevaFecha: r.fecha || '',
-                                      })
-                                    }
-                                    className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold hover:bg-slate-50"
+                                        nuevoBloqueId: bloqueId,
+                                        nuevaFecha: bloque
+                                          ? proximaFechaParaDia(bloque.diaSemana)
+                                          : r.fecha || '',
+                                        nuevoClienteId: '',
+                                      });
+                                      document
+                                        .getElementById('panel-reasignacion')
+                                        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                    }}
+                                    className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
                                   >
                                     Reasignar
                                   </button>
@@ -1619,13 +2039,21 @@ export default function Dashboard({ usuario, onSalir }) {
                     </table>
                   </div>
                 )}
+                <Paginacion
+                  etiqueta="Reservas"
+                  pagina={todasReservasPaginadas.paginaActual}
+                  totalPaginas={todasReservasPaginadas.totalPaginas}
+                  totalRegistros={todasReservas.length}
+                  onCambiar={setPaginaTodasReservas}
+                />
               </div>
             )}
 
             {/* ===============================================================
                 VISTA COORDINADOR / ADMIN: Edición de bloques (HU09, ST02.09)
             =============================================================== */}
-            {(usuario?.rol === 'coordinador' || usuario?.rol === 'administrador') &&
+            {((usuario?.rol === 'coordinador' && vistaCoordinador === 'horarios') ||
+              usuario?.rol === 'administrador') &&
               formBloque.id && (
                 <div className="rounded-[22px] border border-blue-200 bg-white p-6 shadow-sm">
                   <h2 className="text-lg font-bold">
@@ -1664,6 +2092,7 @@ export default function Dashboard({ usuario, onSalir }) {
                     <input
                       type="number"
                       min="1"
+                      max={recintoSeleccionado?.capacidad || undefined}
                       value={formBloque.capacidad}
                       onChange={(e) =>
                         setFormBloque({ ...formBloque, capacidad: e.target.value })
@@ -1671,7 +2100,11 @@ export default function Dashboard({ usuario, onSalir }) {
                       className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
                     />
                     <div className="flex gap-2">
-                      <button type="submit" className="primary-button !py-2 text-xs">
+                      <button
+                        type="submit"
+                        disabled={excedeCapacidadRecinto}
+                        className="primary-button !py-2 text-xs disabled:cursor-not-allowed disabled:opacity-40"
+                      >
                         Guardar
                       </button>
                       <button
@@ -1689,7 +2122,9 @@ export default function Dashboard({ usuario, onSalir }) {
             {/* ===============================================================
                 TABLA GENERAL DE HORARIOS Y RECINTOS
             =============================================================== */}
-            <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
+            {usuario?.rol !== 'instructor' &&
+              !(usuario?.rol === 'coordinador' && vistaCoordinador !== 'horarios') && (
+              <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
                   <h2 className="text-xl font-bold">
@@ -1750,7 +2185,7 @@ export default function Dashboard({ usuario, onSalir }) {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {bloquesFiltrados.map((b) => (
+                      {bloquesPaginados.registros.map((b) => (
                         <tr key={b._id}>
                           <td className="py-3 pr-4 font-bold">
                             {nombreDia(b.diaSemana)} · {b.horaInicio} – {b.horaFin}
@@ -1806,11 +2241,20 @@ export default function Dashboard({ usuario, onSalir }) {
                     </tbody>
                   </table>
                 </div>
-              )}
-            </div>
+                )}
+                <Paginacion
+                  etiqueta="Horarios"
+                  pagina={bloquesPaginados.paginaActual}
+                  totalPaginas={bloquesPaginados.totalPaginas}
+                  totalRegistros={bloquesFiltrados.length}
+                  onCambiar={setPaginaBloques}
+                />
+              </div>
+            )}
           </div>
         )}
       </section>
+
     </main>
   );
 }
