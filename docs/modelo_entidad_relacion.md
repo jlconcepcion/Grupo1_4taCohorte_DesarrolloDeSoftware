@@ -151,7 +151,7 @@ erDiagram
 - **`HU04` y `HU05` (`Recinto`):** Nombre único (`409` si se repite), `tipo` y `capacidad > 0` obligatorios. Soporta desactivación (`activo: false`) para excluir el recinto de nuevas clases y consultas de disponibilidad mientras conserva el historial de clases y reservas.
 - **`HU06` (`Clase`):** Vinculada al instructor autenticado (`instructor`) y a un recinto activo (`recinto`).
 - **`HU07`, `HU08` y `HU09` (`BloqueDisponibilidad`):**
-  - Vinculado a `clase`, `instructor` y `recinto`, con `diaSemana`, `horaInicio`, `horaFin` (`horaFin > horaInicio`) y `capacidad > 0`.
+  - Vinculado a `clase`, `instructor` y `recinto`, con `diaSemana`, `horaInicio`, `horaFin` (`horaFin > horaInicio`) y `capacidad > 0` que no puede superar la `capacidad` del recinto asignado.
   - Validación de no solapamiento para el mismo `instructor` y `diaSemana`.
   - En actualizaciones (`HU08`, `HU09`), no se permite reducir `capacidad` por debajo del número de reservas activas ni eliminar bloques con reservas activas, registrando `modificadoPor` y `fechaModificacion` (`updatedAt`).
 

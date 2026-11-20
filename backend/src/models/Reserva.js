@@ -2,6 +2,29 @@ const mongoose = require('mongoose');
 
 const ESTADOS_RESERVA = ['pendiente', 'confirmada', 'cancelada'];
 
+const cambioReservaSchema = new mongoose.Schema(
+  {
+    usuario: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
+    rol: {
+      type: String,
+      required: true,
+    },
+    fecha: {
+      type: Date,
+      default: Date.now,
+    },
+    resumen: {
+      type: String,
+      default: '',
+    },
+  },
+  { _id: false }
+);
+
 const reservaSchema = new mongoose.Schema(
   {
     cliente: {
@@ -50,6 +73,10 @@ const reservaSchema = new mongoose.Schema(
     motivoCancelacion: {
       type: String,
       default: '',
+    },
+    historialCambios: {
+      type: [cambioReservaSchema],
+      default: [],
     },
   },
   { timestamps: true }

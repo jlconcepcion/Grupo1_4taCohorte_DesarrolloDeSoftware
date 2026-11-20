@@ -137,5 +137,5 @@ classDiagram
 
 ### Fase 5 · Pruebas Automatizadas (`ST03.11`)
 - [x] **Actividad 5.1:** Crear `backend/tests/sprint3_reservas.test.js` cubriendo todos los criterios de aceptación de `HU10` a `HU17` y el flujo E2E (*reservar → confirmar → cancelar → verificar que el horario vuelve a estar libre*).
-- [x] **Actividad 5.2:** Ejecutar `npm test -- --runInBand` en `backend/` (`7 suites / 54 pruebas en verde`).
-- [ ] **Actividad 5.3:** Abrir Pull Request en GitHub *(pendiente hasta que el equipo decida subirlo)*.
+- [x] **Actividad 5.2:** Ejecutar `npm test -- --runInBand` en `backend/` (`7 suites / 64 pruebas en verde`).
+- [x] **Actividad 5.3:** Pull Request abierto y mergeado en `main` (`PR #118`).

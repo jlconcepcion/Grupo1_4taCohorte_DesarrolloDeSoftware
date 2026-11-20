@@ -128,6 +128,7 @@
   - `GET`: Todos los roles autenticados.
   - `POST`: `instructor` (valida `horaFin > horaInicio` y que no exista solapamiento en el mismo día).
   - `PUT / DELETE`: `instructor` (bloques propios), `coordinador` y `administrador` (cualquier bloque, registrando auditoría `modificadoPor` y `fechaModificacion`, y bloqueando eliminación si tiene reservas activas).
+  - `POST` y `PUT`: la `capacidad` del bloque debe ser `> 0`, no superar la `capacidad` del recinto ni quedar por debajo de las reservas activas.
 - **Body JSON (`POST`):**
   ```json
   {
@@ -147,7 +148,7 @@
 ### `GET /api/reservas/disponibilidad` (`HU10`, `ST03.03`)
 - **Acceso:** Todos los roles autenticados
 - **Query params opcionales:** `?fecha=2026-11-24&recinto=<id>&clase=<id>&instructor=<id>`
-- **Comportamiento:** Devuelve únicamente bloques en recintos activos con `cuposLibres > 0`.
+- **Comportamiento:** Devuelve únicamente bloques en recintos activos con `cuposLibres > 0`. `fecha` debe ser `YYYY-MM-DD` futura o de hoy; los filtros por `clase` e `instructor` están soportados.
 
 ### `POST /api/reservas` (`HU11`, `ST03.05`)
 - **Acceso:** Exclusivo `cliente`
@@ -158,7 +159,8 @@
     "fecha": "2026-11-24"
   }
   ```
-- **Respuestas:** `201 Created` (nace en `estado: "pendiente"`), `409 Conflict` (bloque lleno o reserva activa duplicada del mismo cliente).
+- **Respuestas:** `201 Created` (nace en `estado: "pendiente"`), `400 Bad Request` (fecha inválida/pasada o día distinto al del bloque), `409 Conflict` (bloque lleno o reserva activa duplicada).
+- **Concurrencia:** validación y escritura protegidas por bloqueo por `bloqueId + fecha` y transacción en Atlas / replica set (`mongodb+srv://` o `replicaSet=`); en standalone se usa el bloqueo en proceso.
 
 ### `GET /api/reservas/mias` (`HU13`)
 - **Acceso:** Exclusivo `cliente`
@@ -173,9 +175,10 @@
 ### `GET /api/reservas` (`HU15`, `ST03.07`)
 - **Acceso:** `coordinador` y `administrador`
 - **Query params opcionales:** `?fecha=YYYY-MM-DD&recinto=<id>&clase=<id>&instructor=<id>&estado=pendiente|confirmada|cancelada`
+- **Validación:** `fecha` debe ser futura o de hoy y `estado` debe pertenecer a los tres valores permitidos.
 
 ### `PATCH /api/reservas/:id/confirmar` (`HU16`, `ST03.08`)
-- **Acceso:** `coordinador` y `administrador` (confirma una reserva pendiente y registra `gestionadoPor` y `fechaConfirmacion`).
+- **Acceso:** `coordinador` y `administrador` (confirma una reserva pendiente y registra `gestionadoPor` y `fechaConfirmacion`; si ya está confirmada responde `200` sin duplicar cambios).
 
 ### `PATCH /api/reservas/:id/cancelar` (`HU17`, `ST03.08`)
 - **Acceso:** `coordinador` y `administrador`
@@ -190,10 +193,13 @@
   ```json
   {
     "nuevoBloqueId": "<id_bloque_destino>",
-    "nuevaFecha": "2026-11-26"
+    "nuevaFecha": "2026-11-26",
+    "nuevoClienteId": "<id_cliente_destino_opcional>"
   }
   ```
+- **Validación:** comprueba día de la semana, capacidad, recinto/clase activos, cliente destino activo y duplicados; registra `historialCambios` y sincroniza contadores de ambos bloques.
 
 ### `GET /api/reservas/conteo-instructor` (`ST03.09`)
 - **Acceso:** `instructor`, `coordinador` y `administrador`
-- **Respuesta:** Lista de bloques con `totalReservadas`, `confirmadas`, `pendientes`, `canceladas` y `cuposLibres`.
+- **Query param opcional:** `?fecha=YYYY-MM-DD` (futura o de hoy).
+- **Respuesta:** Lista de bloques con `totalReservadas`, `confirmadas`, `pendientes`, `canceladas`, `cuposLibres` y `fechaFiltro`.

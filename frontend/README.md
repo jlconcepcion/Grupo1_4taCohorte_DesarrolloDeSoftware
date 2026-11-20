@@ -20,7 +20,7 @@ npm run preview  # Sirve el build localmente
 
 ```text
 src/
-├── api.js              # Cliente HTTP con JWT en localStorage (auth, usuariosApi, recintosApi, clasesApi, bloquesApi)
+├── api.js              # Cliente HTTP con JWT en sessionStorage (sesión independiente por pestaña) (auth, usuariosApi, recintosApi, clasesApi, bloquesApi)
 ├── App.jsx             # Enrutamiento de estado: Landing -> Login / Registro -> Dashboard por rol
 ├── main.jsx            # Punto de entrada de React
 ├── index.css           # Tailwind CSS v4, tema y componentes visuales del diseño de Figma
@@ -37,8 +37,10 @@ src/
                         # - Cliente: Consultar recintos activos y horarios disponibles por día/recinto (ST02.10)
 ```
 
+La sesión JWT se guarda en `sessionStorage`: cada pestaña mantiene su propio usuario y token, por lo que se pueden usar roles distintos simultáneamente. Recargar conserva la sesión de esa pestaña; cerrarla la descarta.
+
 En producción dentro de Docker, el contenedor Nginx (`frontend/Dockerfile` y `frontend/nginx.conf`) sirve `dist/` en el puerto `8080` y redirige `/api` hacia el contenedor `backend:3000`.
-├── api.js              # Cliente HTTP (JWT en localStorage)
+├── api.js              # Cliente HTTP con JWT en sessionStorage
 ├── App.jsx             # Landing -> login/registro -> panel según sesión
 ├── main.jsx            # Punto de entrada
 ├── index.css           # Tailwind v4, tema y estilos del diseño de Figma

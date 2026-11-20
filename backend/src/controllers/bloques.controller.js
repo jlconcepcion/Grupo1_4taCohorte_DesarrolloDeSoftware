@@ -46,19 +46,14 @@ function tieneAlgunPermiso(rol, listaPermisos) {
 }
 
 async function obtenerConteoReservasActivas(bloqueDoc) {
-  const desdeDocumento = Number(bloqueDoc.reservasActivas || 0);
-  try {
-    if (Reserva && typeof Reserva.countDocuments === 'function') {
-      const enColeccion = await Reserva.countDocuments({
-        bloque: bloqueDoc._id,
-        estado: { $in: ['pendiente', 'confirmada'] },
-      });
-      return Math.max(desdeDocumento, Number(enColeccion || 0));
-    }
-  } catch (_) {
-    // En pruebas unitarias con mocks parciales se usa el campo del documento
+  if (Reserva && typeof Reserva.countDocuments === 'function') {
+    const enColeccion = await Reserva.countDocuments({
+      bloque: bloqueDoc._id,
+      estado: { $in: ['pendiente', 'confirmada'] },
+    });
+    return Number(enColeccion || 0);
   }
-  return desdeDocumento;
+  return Number(bloqueDoc.reservasActivas || 0);
 }
 
 // GET /api/bloques (HU07, HU09, ST02.09, ST02.10)
@@ -152,6 +147,13 @@ async function crearBloque(req, res) {
       return res
         .status(400)
         .json({ mensaje: 'No se puede registrar un bloque en un recinto inactivo' });
+    }
+
+    const capacidadRecinto = Number(recintoDoc.capacidad);
+    if (Number.isFinite(capacidadRecinto) && capNum > capacidadRecinto) {
+      return res.status(400).json({
+        mensaje: `La capacidad del bloque (${capNum}) no puede superar la capacidad del recinto (${capacidadRecinto})`,
+      });
     }
 
     const claseDoc = await Clase.findById(clase);
@@ -266,8 +268,9 @@ async function actualizarBloque(req, res) {
       });
     }
 
-    if (recinto !== undefined) {
-      const recintoDoc = await Recinto.findById(recinto);
+    const recintoId = recinto !== undefined ? recinto : bloque.recinto?._id || bloque.recinto;
+    if (recinto !== undefined || capacidad !== undefined) {
+      const recintoDoc = await Recinto.findById(recintoId);
       if (!recintoDoc) {
         return res.status(404).json({ mensaje: 'El recinto seleccionado no existe' });
       }
@@ -276,7 +279,17 @@ async function actualizarBloque(req, res) {
           .status(400)
           .json({ mensaje: 'No se puede asignar el bloque a un recinto inactivo' });
       }
-      bloque.recinto = recintoDoc._id || recinto;
+
+      const capacidadRecinto = Number(recintoDoc.capacidad);
+      if (Number.isFinite(capacidadRecinto) && nuevaCapacidad > capacidadRecinto) {
+        return res.status(400).json({
+          mensaje: `La capacidad del bloque (${nuevaCapacidad}) no puede superar la capacidad del recinto (${capacidadRecinto})`,
+        });
+      }
+
+      if (recinto !== undefined) {
+        bloque.recinto = recintoDoc._id || recinto;
+      }
     }
 
     // Validar que el cambio no provoque solapamiento con otros bloques del mismo instructor ese día

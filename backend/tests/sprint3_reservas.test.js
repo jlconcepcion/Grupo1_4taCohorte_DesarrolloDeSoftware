@@ -9,12 +9,26 @@ jest.mock('../src/models/Reserva');
 const request = require('supertest');
 const app = require('../src/app');
 const { firmarToken } = require('../src/config/jwt');
+const User = require('../src/models/User');
 const Recinto = require('../src/models/Recinto');
 const BloqueDisponibilidad = require('../src/models/BloqueDisponibilidad');
 const Reserva = require('../src/models/Reserva');
 
 function tokenPara(rol, id = 'usr-1') {
   return firmarToken({ _id: id, rol });
+}
+
+function fechaRelativa(dias) {
+  const fecha = new Date();
+  fecha.setDate(fecha.getDate() + dias);
+  return `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(
+    fecha.getDate()
+  ).padStart(2, '0')}`;
+}
+
+function diaDeFecha(fecha) {
+  const [anio, mes, dia] = fecha.split('-').map(Number);
+  return new Date(anio, mes - 1, dia, 12).getDay();
 }
 
 beforeEach(() => {
@@ -389,5 +403,153 @@ describe('ST03.11 · Prueba E2E del flujo: reservar → confirmar → cancelar �
     expect(dispFinal.body).toHaveLength(1);
     expect(dispFinal.body[0].cuposLibres).toBe(1);
     expect(estadoMemoria[0].estado).toBe('cancelada');
+  });
+});
+
+describe('P0 · Validaciones de fecha y reasignación', () => {
+  it('rechaza fechas pasadas e imposibles en disponibilidad y creación', async () => {
+    const token = `Bearer ${tokenPara('cliente', 'cli-fechas')}`;
+
+    const pasada = await request(app)
+      .get('/api/reservas/disponibilidad?fecha=2020-01-01')
+      .set('Authorization', token);
+    expect(pasada.statusCode).toBe(400);
+
+    const imposible = await request(app)
+      .post('/api/reservas')
+      .set('Authorization', token)
+      .send({ bloqueId: 'blq-1', fecha: '2026-13-45' });
+    expect(imposible.statusCode).toBe(400);
+  });
+
+  it('rechaza reasignar a una fecha pasada', async () => {
+    Reserva.findById.mockResolvedValue({
+      _id: 'res-pasada',
+      cliente: 'cli-1',
+      bloque: 'blq-1',
+      recinto: 'rec-1',
+      fecha: '2099-12-16',
+      estado: 'pendiente',
+      save: jest.fn(),
+    });
+
+    const res = await request(app)
+      .patch('/api/reservas/res-pasada/reasignar')
+      .set('Authorization', `Bearer ${tokenPara('administrador', 'adm-1')}`)
+      .send({ nuevoBloqueId: 'blq-2', nuevaFecha: fechaRelativa(-2) });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body.mensaje).toMatch(/futura/i);
+  });
+
+  it('rechaza reasignar a un cliente que no existe', async () => {
+    const fecha = fechaRelativa(3);
+    Reserva.findById.mockResolvedValue({
+      _id: 'res-cliente',
+      cliente: 'cli-1',
+      bloque: 'blq-1',
+      recinto: 'rec-1',
+      fecha: '2099-12-16',
+      estado: 'pendiente',
+      save: jest.fn(),
+    });
+    BloqueDisponibilidad.findById.mockResolvedValue({
+      _id: 'blq-2',
+      recinto: 'rec-2',
+      clase: 'cls-2',
+      diaSemana: diaDeFecha(fecha),
+      capacidad: 5,
+      save: jest.fn(),
+    });
+    Recinto.findById.mockResolvedValue({ _id: 'rec-2', activo: true });
+    Reserva.countDocuments.mockResolvedValue(0);
+    Reserva.findOne.mockResolvedValue(null);
+
+    const res = await request(app)
+      .patch('/api/reservas/res-cliente/reasignar')
+      .set('Authorization', `Bearer ${tokenPara('administrador', 'adm-1')}`)
+      .send({ nuevoBloqueId: 'blq-2', nuevaFecha: fecha, nuevoClienteId: 'usr-inexistente' });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.body.mensaje).toMatch(/cliente de destino/i);
+  });
+
+  it('reasigna solo el cliente aunque la fecha legacy no coincida con el día del bloque', async () => {
+    Reserva.findById.mockResolvedValue({
+      _id: 'res-legacy',
+      cliente: 'cli-1',
+      bloque: 'blq-legacy',
+      recinto: 'rec-1',
+      fecha: '2026-11-24',
+      estado: 'pendiente',
+      save: jest.fn(),
+    });
+    BloqueDisponibilidad.findById.mockResolvedValue({
+      _id: 'blq-legacy',
+      diaSemana: 4,
+      capacidad: 5,
+      recinto: 'rec-1',
+      save: jest.fn(),
+    });
+    Recinto.findById.mockResolvedValue({ _id: 'rec-1', activo: true });
+    Reserva.countDocuments.mockResolvedValue(1);
+    Reserva.findOne.mockResolvedValue(null);
+    User.findById.mockResolvedValue({ _id: 'cli-2', activo: true });
+
+    const res = await request(app)
+      .patch('/api/reservas/res-legacy/reasignar')
+      .set('Authorization', `Bearer ${tokenPara('administrador', 'adm-1')}`)
+      .send({
+        nuevoBloqueId: 'blq-legacy',
+        nuevaFecha: '2026-11-24',
+        nuevoClienteId: 'cli-2',
+      });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.cliente).toBe('cli-2');
+    expect(res.body.fecha).toBe('2026-11-24');
+  });
+
+  it('la confirmación del coordinador es idempotente', async () => {
+    Reserva.findById.mockResolvedValue({
+      _id: 'res-confirmada',
+      cliente: 'cli-1',
+      bloque: 'blq-1',
+      recinto: 'rec-1',
+      fecha: '2099-12-16',
+      estado: 'confirmada',
+      save: jest.fn(),
+    });
+
+    const res = await request(app)
+      .patch('/api/reservas/res-confirmada/confirmar')
+      .set('Authorization', `Bearer ${tokenPara('coordinador', 'coord-1')}`);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.estado).toBe('confirmada');
+  });
+});
+
+describe('P0 · RBAC sobre rutas reales de reservas', () => {
+  it('un cliente no puede consultar el listado global', async () => {
+    const res = await request(app)
+      .get('/api/reservas')
+      .set('Authorization', `Bearer ${tokenPara('cliente', 'cli-rbac')}`);
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('un coordinador no puede crear reservas', async () => {
+    const res = await request(app)
+      .post('/api/reservas')
+      .set('Authorization', `Bearer ${tokenPara('coordinador', 'coord-rbac')}`)
+      .send({ bloqueId: 'blq-1', fecha: fechaRelativa(2) });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('un instructor no puede consultar /mias', async () => {
+    const res = await request(app)
+      .get('/api/reservas/mias')
+      .set('Authorization', `Bearer ${tokenPara('instructor', 'inst-rbac')}`);
+    expect(res.statusCode).toBe(403);
   });
 });

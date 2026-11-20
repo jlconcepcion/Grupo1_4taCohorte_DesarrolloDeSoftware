@@ -172,7 +172,7 @@ describe('HU06 · Crear y Actualizar Clases del Instructor (ST02.04)', () => {
 
 describe('HU07, HU08 y HU09 · Bloques de Disponibilidad, Solapamientos y Reservas Activas (ST02.05–ST02.11)', () => {
   it('registra un bloque válido cuando no hay solapamiento (HU07, ST02.05, ST02.11)', async () => {
-    Recinto.findById.mockResolvedValue({ _id: 'rec-1', activo: true });
+    Recinto.findById.mockResolvedValue({ _id: 'rec-1', activo: true, capacidad: 20 });
     Clase.findById.mockResolvedValue({ _id: 'cls-1', instructor: 'inst-1' });
     BloqueDisponibilidad.find.mockResolvedValue([
       { _id: 'blq-prev', diaSemana: 2, horaInicio: '14:00', horaFin: '16:00' },
@@ -204,6 +204,28 @@ describe('HU07, HU08 y HU09 · Bloques de Disponibilidad, Solapamientos y Reserv
     expect(res.body.horaInicio).toBe('16:00');
   });
 
+  it('rechaza un bloque cuya capacidad supera la del recinto con 400 (HU05, HU07)', async () => {
+    Recinto.findById.mockResolvedValue({ _id: 'rec-1', activo: true, capacidad: 10 });
+    Clase.findById.mockResolvedValue({ _id: 'cls-1', instructor: 'inst-1' });
+    BloqueDisponibilidad.find.mockResolvedValue([]);
+
+    const res = await request(app)
+      .post('/api/bloques')
+      .set('Authorization', `Bearer ${tokenPara('instructor', 'inst-1')}`)
+      .send({
+        clase: 'cls-1',
+        recinto: 'rec-1',
+        diaSemana: 2,
+        horaInicio: '16:00',
+        horaFin: '18:00',
+        capacidad: 11,
+      });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body.mensaje).toMatch(/no puede superar la capacidad del recinto/i);
+    expect(BloqueDisponibilidad.create).not.toHaveBeenCalled();
+  });
+
   it('rechaza un bloque con horaFin <= horaInicio con 400 (HU07, ST02.05)', async () => {
     const res = await request(app)
       .post('/api/bloques')
@@ -222,7 +244,7 @@ describe('HU07, HU08 y HU09 · Bloques de Disponibilidad, Solapamientos y Reserv
   });
 
   it('rechaza un bloque solapado (17:00-19:00 cuando existe 16:00-18:00 el mismo día) con 409 (HU07, ST02.06, ST02.11)', async () => {
-    Recinto.findById.mockResolvedValue({ _id: 'rec-1', activo: true });
+    Recinto.findById.mockResolvedValue({ _id: 'rec-1', activo: true, capacidad: 20 });
     Clase.findById.mockResolvedValue({ _id: 'cls-1', instructor: 'inst-1' });
     BloqueDisponibilidad.find.mockResolvedValue([
       { _id: 'blq-1', diaSemana: 2, horaInicio: '16:00', horaFin: '18:00' },
@@ -258,6 +280,7 @@ describe('HU07, HU08 y HU09 · Bloques de Disponibilidad, Solapamientos y Reserv
       save: jest.fn(),
     };
     BloqueDisponibilidad.findById.mockResolvedValue(bloqueExistente);
+    Recinto.findById.mockResolvedValue({ _id: 'rec-1', activo: true, capacidad: 10 });
     Reserva.countDocuments.mockResolvedValue(6);
 
     const res = await request(app)
@@ -267,6 +290,32 @@ describe('HU07, HU08 y HU09 · Bloques de Disponibilidad, Solapamientos y Reserv
 
     expect(res.statusCode).toBe(409);
     expect(res.body.mensaje).toMatch(/por debajo de las reservas activas/i);
+    expect(bloqueExistente.save).not.toHaveBeenCalled();
+  });
+
+  it('rechaza aumentar la capacidad por encima del recinto con 400 (HU05, HU08)', async () => {
+    const bloqueExistente = {
+      _id: 'blq-1',
+      instructor: 'inst-1',
+      recinto: 'rec-1',
+      diaSemana: 2,
+      horaInicio: '16:00',
+      horaFin: '18:00',
+      capacidad: 10,
+      reservasActivas: 2,
+      save: jest.fn(),
+    };
+    BloqueDisponibilidad.findById.mockResolvedValue(bloqueExistente);
+    Recinto.findById.mockResolvedValue({ _id: 'rec-1', activo: true, capacidad: 10 });
+    Reserva.countDocuments.mockResolvedValue(2);
+
+    const res = await request(app)
+      .put('/api/bloques/blq-1')
+      .set('Authorization', `Bearer ${tokenPara('instructor', 'inst-1')}`)
+      .send({ capacidad: 11 });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body.mensaje).toMatch(/no puede superar la capacidad del recinto/i);
     expect(bloqueExistente.save).not.toHaveBeenCalled();
   });
 
