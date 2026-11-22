@@ -1,6 +1,10 @@
 const User = require('../models/User');
 const { firmarToken } = require('../config/jwt');
 const {
+  preferenciasRecordatorioPorDefecto,
+  validarPreferenciasRecordatorio,
+} = require('../config/notificaciones');
+const {
   enviarBienvenida,
   registrarNotificacionNavegacion,
 } = require('../services/notificaciones.service');
@@ -8,7 +12,7 @@ const {
 const CORREO_REGEX = /^\S+@\S+\.\S+$/;
 const TELEFONO_REGEX = /^\+?[1-9]\d{1,14}$/;
 
-function validarRegistro({ correo, password, telefono }) {
+function validarRegistro({ correo, password, telefono, preferenciasRecordatorio }) {
   const errores = [];
   if (!correo || !CORREO_REGEX.test(correo)) errores.push('Correo inválido');
   if (!password || password.length < 8) {
@@ -17,14 +21,23 @@ function validarRegistro({ correo, password, telefono }) {
   if (telefono && !TELEFONO_REGEX.test(telefono)) {
     errores.push('El teléfono debe estar en formato E.164');
   }
-  return errores;
+  const validacion = validarPreferenciasRecordatorio(
+    preferenciasRecordatorio ?? preferenciasRecordatorioPorDefecto()
+  );
+  errores.push(...validacion.errores);
+  return { errores, preferencias: validacion.preferencias };
 }
 
 // ST01.03: registro público de clientes.
 async function registro(req, res) {
-  const { correo, password, telefono = '' } = req.body || {};
+  const { correo, password, telefono = '', preferenciasRecordatorio } = req.body || {};
   const telefonoNormalizado = String(telefono).trim();
-  const errores = validarRegistro({ correo, password, telefono: telefonoNormalizado });
+  const { errores, preferencias } = validarRegistro({
+    correo,
+    password,
+    telefono: telefonoNormalizado,
+    preferenciasRecordatorio,
+  });
   if (errores.length) {
     return res.status(400).json({ mensaje: 'Datos inválidos', errores });
   }
@@ -35,6 +48,7 @@ async function registro(req, res) {
       password,
       rol: 'cliente',
       telefono: telefonoNormalizado,
+      preferenciasRecordatorio: preferencias,
     });
 
     registrarNotificacionNavegacion({

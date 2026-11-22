@@ -381,7 +381,15 @@
     "sprint": "Sprint 4",
     "area": "Frontend",
     "subtarea": "Añadir canal de notificación por navegación: aviso persistido para el usuario, visible al entrar al Dashboard y al cambiar de pestaña, sin depender de SMTP ni Twilio.",
-    "criterio": "Al crear un usuario aparece un aviso en navegación para el administrador y, al iniciar sesión el nuevo usuario, aparece su aviso de bienvenida."
+    "criterio": "Al crear un usuario aparece un aviso en la bandeja de navegación del administrador y, al iniciar sesión el nuevo usuario, aparece su aviso de bienvenida en su propia bandeja."
+  },
+  {
+    "id": "ST04.15",
+    "historia": "HU04",
+    "sprint": "Sprint 4",
+    "area": "Backend/Frontend",
+    "subtarea": "Configurar preferencias de recordatorio por usuario: canales email, WhatsApp y navegación, activación y minutos de anticipación, con endpoints self y administrativo y controles en registro y Dashboard.",
+    "criterio": "El recordatorio usa solo los canales activos del cliente, respeta su anticipación para la ventana y el TTL del token, y RBAC impide que un usuario edite las preferencias de otro."
   },
   {
     "id": "ST05.01",

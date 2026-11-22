@@ -18,7 +18,28 @@ const MONGODB_SCHEMAS = {
             enum: ['cliente', 'coordinador', 'instructor', 'administrador']
           },
           activo: { bsonType: 'bool' },
-          telefono: { bsonType: 'string', pattern: '^(\\+?[1-9][0-9]{1,14})?$' }
+          telefono: { bsonType: 'string', pattern: '^(\\+?[1-9][0-9]{1,14})?$' },
+          preferenciasRecordatorio: {
+            bsonType: 'object',
+            required: ['activo', 'canales'],
+            properties: {
+              activo: { bsonType: 'bool' },
+              canales: {
+                bsonType: 'array',
+                minItems: 1,
+                uniqueItems: true,
+                items: {
+                  bsonType: 'string',
+                  enum: ['email', 'whatsapp', 'navegacion']
+                }
+              },
+              minutosAnticipacion: {
+                bsonType: ['number', 'null'],
+                minimum: 5,
+                maximum: 1440
+              }
+            }
+          }
         }
       }
     },

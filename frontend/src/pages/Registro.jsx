@@ -4,6 +4,16 @@ import Icon from '../components/Icon.jsx';
 
 const CORREO_REGEX = /^\S+@\S+\.\S+$/;
 const TELEFONO_REGEX = /^\+?[1-9]\d{1,14}$/;
+const CANALES_RECORDATORIO = [
+  { valor: 'email', etiqueta: 'Correo' },
+  { valor: 'whatsapp', etiqueta: 'WhatsApp' },
+  { valor: 'navegacion', etiqueta: 'Aviso en la app' },
+];
+const PREFERENCIAS_INICIALES = {
+  activo: true,
+  canales: ['email', 'whatsapp', 'navegacion'],
+  minutosAnticipacion: null,
+};
 
 export default function Registro({ onLogin, onIrALogin, onVolver }) {
   const [correo, setCorreo] = useState('');
@@ -12,6 +22,7 @@ export default function Registro({ onLogin, onIrALogin, onVolver }) {
   const [confirmacion, setConfirmacion] = useState('');
   const [errores, setErrores] = useState({});
   const [enviando, setEnviando] = useState(false);
+  const [preferencias, setPreferencias] = useState(PREFERENCIAS_INICIALES);
 
   async function manejarEnvio(evento) {
     evento.preventDefault();
@@ -29,19 +40,36 @@ export default function Registro({ onLogin, onIrALogin, onVolver }) {
     if (password && confirmacion !== password) {
       nuevosErrores.confirmacion = 'Las contraseñas no coinciden';
     }
+    if (preferencias.activo && preferencias.canales.length === 0) {
+      nuevosErrores.preferencias = 'Selecciona al menos un canal de recordatorio';
+    }
 
     setErrores(nuevosErrores);
     if (Object.keys(nuevosErrores).length) return;
 
     setEnviando(true);
     try {
-      const datos = await auth.registro(correo.trim(), password, telefono.trim());
+      const datos = await auth.registro(
+        correo.trim(),
+        password,
+        telefono.trim(),
+        preferencias
+      );
       onLogin(datos.token, datos.usuario);
     } catch (error) {
       setErrores({ general: error.message });
     } finally {
       setEnviando(false);
     }
+  }
+
+  function alternarCanal(canal) {
+    setPreferencias((actual) => ({
+      ...actual,
+      canales: actual.canales.includes(canal)
+        ? actual.canales.filter((item) => item !== canal)
+        : [...actual.canales, canal],
+    }));
   }
 
   return (
@@ -111,6 +139,63 @@ export default function Registro({ onLogin, onIrALogin, onVolver }) {
                   </span>
                 )}
               </label>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p className="mb-3 text-sm font-semibold text-slate-700">
+                  Preferencias del recordatorio
+                </p>
+                <label className="flex items-center gap-2 text-sm text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={preferencias.activo}
+                    onChange={(e) =>
+                      setPreferencias({ ...preferencias, activo: e.target.checked })
+                    }
+                  />
+                  Recibir recordatorios de reservas
+                </label>
+                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  {CANALES_RECORDATORIO.map((canal) => (
+                    <label
+                      key={canal.valor}
+                      className="flex items-center gap-2 text-xs font-medium text-slate-600"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={preferencias.canales.includes(canal.valor)}
+                        onChange={() => alternarCanal(canal.valor)}
+                      />
+                      {canal.etiqueta}
+                    </label>
+                  ))}
+                </div>
+                <label className="mt-3 block text-xs font-semibold text-slate-600">
+                  Anticipación
+                  <select
+                    value={preferencias.minutosAnticipacion ?? ''}
+                    onChange={(e) =>
+                      setPreferencias({
+                        ...preferencias,
+                        minutosAnticipacion: e.target.value ? Number(e.target.value) : null,
+                      })
+                    }
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                  >
+                    <option value="">Predeterminada (60 min)</option>
+                    <option value="15">15 minutos</option>
+                    <option value="30">30 minutos</option>
+                    <option value="60">1 hora</option>
+                    <option value="120">2 horas</option>
+                    <option value="240">4 horas</option>
+                    <option value="1440">24 horas</option>
+                  </select>
+                </label>
+                {errores.preferencias && (
+                  <span className="mt-2 block text-xs font-medium text-red-600">
+                    {errores.preferencias}
+                  </span>
+                )}
+              </div>
 
               <label className="block">
                 <span className="mb-2 block text-sm font-semibold text-slate-700">

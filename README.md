@@ -187,7 +187,7 @@ Disponible en http://localhost:5173 (Vite redirige `/api` al backend en el puert
 ## Pruebas Automatizadas y Documentación
 
 ```bash
-cd backend && npm test -- --runInBand   # 9 suites / 80 pruebas en Jest + Supertest (Sprints 1-4)
+cd backend && npm test -- --runInBand   # 10 suites / 85 pruebas en Jest + Supertest (Sprints 1-4)
 cd frontend && npm run build            # Verificación de compilación de React + Vite
 ```
 

@@ -8,6 +8,7 @@ import {
   reservasApi,
   reportesApi,
   notificacionesApi,
+  preferenciasApi,
 } from '../api.js';
 
 const DIAS_SEMANA = [
@@ -23,6 +24,80 @@ const DIAS_SEMANA = [
 function nombreDia(numero) {
   const encontrado = DIAS_SEMANA.find((d) => d.valor === Number(numero));
   return encontrado ? encontrado.etiqueta : `Día ${numero}`;
+}
+
+const CANALES_RECORDATORIO = [
+  { valor: 'email', etiqueta: 'Correo' },
+  { valor: 'whatsapp', etiqueta: 'WhatsApp' },
+  { valor: 'navegacion', etiqueta: 'Aviso en la app' },
+];
+
+function preferenciasRecordatorioIniciales() {
+  return {
+    activo: true,
+    canales: ['email', 'whatsapp', 'navegacion'],
+    minutosAnticipacion: null,
+  };
+}
+
+function ControlesPreferencias({ valor, onChange }) {
+  const preferencias = valor || preferenciasRecordatorioIniciales();
+
+  function alternarCanal(canal) {
+    const canales = preferencias.canales.includes(canal)
+      ? preferencias.canales.filter((item) => item !== canal)
+      : [...preferencias.canales, canal];
+    onChange({ ...preferencias, canales });
+  }
+
+  return (
+    <div className="space-y-3">
+      <label className="flex items-center gap-2 text-sm text-slate-600">
+        <input
+          type="checkbox"
+          checked={preferencias.activo}
+          onChange={(e) => onChange({ ...preferencias, activo: e.target.checked })}
+        />
+        Recibir recordatorios de reservas
+      </label>
+      <div className="grid gap-2 sm:grid-cols-3">
+        {CANALES_RECORDATORIO.map((canal) => (
+          <label
+            key={canal.valor}
+            className="flex items-center gap-2 text-xs font-medium text-slate-600"
+          >
+            <input
+              type="checkbox"
+              checked={preferencias.canales.includes(canal.valor)}
+              onChange={() => alternarCanal(canal.valor)}
+            />
+            {canal.etiqueta}
+          </label>
+        ))}
+      </div>
+      <label className="block text-xs font-semibold text-slate-600">
+        Anticipación
+        <select
+          value={preferencias.minutosAnticipacion ?? ''}
+          onChange={(e) =>
+            onChange({
+              ...preferencias,
+              minutosAnticipacion: e.target.value ? Number(e.target.value) : null,
+            })
+          }
+          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+        >
+          <option value="">Predeterminada (60 min)</option>
+          <option value="15">15 minutos</option>
+          <option value="30">30 minutos</option>
+          <option value="60">1 hora</option>
+          <option value="120">2 horas</option>
+          <option value="240">4 horas</option>
+          <option value="1440">24 horas</option>
+        </select>
+      </label>
+    </div>
+  );
 }
 
 /**
@@ -158,7 +233,12 @@ export default function Dashboard({ usuario, onSalir }) {
   const [mensajeExito, setMensajeExito] = useState('');
   const [mensajeError, setMensajeError] = useState('');
   const [notificacionesNavegacion, setNotificacionesNavegacion] = useState([]);
-  const [notificacionActiva, setNotificacionActiva] = useState(null);
+  const [panelNotificacionesAbierto, setPanelNotificacionesAbierto] = useState(false);
+  const [modalPreferencias, setModalPreferencias] = useState(false);
+  const [usuarioPreferencias, setUsuarioPreferencias] = useState(null);
+  const [preferenciasRecordatorio, setPreferenciasRecordatorio] = useState(
+    preferenciasRecordatorioIniciales
+  );
 
   // Estado para formulario de Recintos (HU04 / HU05 - Administrador)
   const [formRecinto, setFormRecinto] = useState({
@@ -175,6 +255,7 @@ export default function Dashboard({ usuario, onSalir }) {
     password: '',
     telefono: '',
     rol: 'cliente',
+    preferenciasRecordatorio: preferenciasRecordatorioIniciales(),
   });
 
   // Estado para formulario de Clases (HU06 - Instructor)
@@ -264,25 +345,71 @@ export default function Dashboard({ usuario, onSalir }) {
   async function cargarNotificacionesNavegacion() {
     try {
       const lista = await notificacionesApi.mias();
-      const pendientes = (Array.isArray(lista) ? lista : []).filter(
-        (notificacion) => !notificacion.leida
-      );
-      setNotificacionesNavegacion(pendientes);
-      setNotificacionActiva((actual) => actual || pendientes[0] || null);
+      setNotificacionesNavegacion(Array.isArray(lista) ? lista : []);
     } catch {
       setNotificacionesNavegacion([]);
     }
   }
 
-  async function cerrarNotificacionNavegacion() {
-    const notificacion = notificacionActiva;
-    setNotificacionActiva(null);
-    setNotificacionesNavegacion((lista) => lista.filter((item) => item._id !== notificacion?._id));
-    if (!notificacion?._id) return;
+  async function marcarNotificacionLeida(id) {
     try {
-      await notificacionesApi.marcarLeida(notificacion._id);
+      await notificacionesApi.marcarLeida(id);
+      setNotificacionesNavegacion((lista) =>
+        lista.map((item) => (item._id === id ? { ...item, leida: true } : item))
+      );
     } catch {
       setMensajeError('No se pudo marcar la notificación como leída');
+    }
+  }
+
+  async function marcarTodasNotificacionesLeidas() {
+    const pendientes = notificacionesNavegacion.filter((item) => !item.leida);
+    if (!pendientes.length) return;
+    try {
+      await Promise.all(pendientes.map((item) => notificacionesApi.marcarLeida(item._id)));
+      setNotificacionesNavegacion((lista) => lista.map((item) => ({ ...item, leida: true })));
+    } catch {
+      setMensajeError('No se pudieron marcar todas las notificaciones como leídas');
+    }
+  }
+
+  async function abrirPreferencias(usuarioDestino = null) {
+    limpiarAvisos();
+    try {
+      const datos = usuarioDestino
+        ? await preferenciasApi.deUsuario(usuarioDestino._id)
+        : await preferenciasApi.mias();
+      setUsuarioPreferencias(usuarioDestino);
+      setPreferenciasRecordatorio(
+        datos.preferenciasRecordatorio || preferenciasRecordatorioIniciales()
+      );
+      setModalPreferencias(true);
+    } catch (err) {
+      setMensajeError(err.message || 'No se pudieron cargar las preferencias');
+    }
+  }
+
+  async function guardarPreferencias() {
+    limpiarAvisos();
+    if (preferenciasRecordatorio.activo && !preferenciasRecordatorio.canales.length) {
+      setMensajeError('Selecciona al menos un canal de recordatorio');
+      return;
+    }
+    try {
+      const datos = usuarioPreferencias
+        ? await preferenciasApi.guardarDeUsuario(
+            usuarioPreferencias._id,
+            preferenciasRecordatorio
+          )
+        : await preferenciasApi.guardarMias(preferenciasRecordatorio);
+      setPreferenciasRecordatorio(
+        datos.preferenciasRecordatorio || preferenciasRecordatorioIniciales()
+      );
+      setModalPreferencias(false);
+      setMensajeExito('Preferencias de recordatorio actualizadas');
+      await cargarDatos();
+    } catch (err) {
+      setMensajeError(err.errores?.join(' · ') || err.message);
     }
   }
 
@@ -492,10 +619,23 @@ export default function Dashboard({ usuario, onSalir }) {
   async function guardarNuevoUsuario(e) {
     e.preventDefault();
     limpiarAvisos();
+    if (
+      formUsuario.preferenciasRecordatorio.activo &&
+      !formUsuario.preferenciasRecordatorio.canales.length
+    ) {
+      setMensajeError('Selecciona al menos un canal de recordatorio');
+      return;
+    }
     try {
       await usuariosApi.crear(formUsuario);
       setMensajeExito(`Cuenta creada para ${formUsuario.correo} con rol ${formUsuario.rol}.`);
-      setFormUsuario({ correo: '', password: '', telefono: '', rol: 'cliente' });
+      setFormUsuario({
+        correo: '',
+        password: '',
+        telefono: '',
+        rol: 'cliente',
+        preferenciasRecordatorio: preferenciasRecordatorioIniciales(),
+      });
       await cargarDatos();
       await cargarNotificacionesNavegacion();
     } catch (err) {
@@ -721,6 +861,7 @@ export default function Dashboard({ usuario, onSalir }) {
     ).values(),
   ];
   const clientesParaReasignar = usuarios.filter((u) => u.rol === 'cliente');
+  const notificacionesPendientes = notificacionesNavegacion.filter((item) => !item.leida);
 
   return (
     <main className="min-h-screen bg-[#f7faff] text-[#10233f]">
@@ -741,13 +882,24 @@ export default function Dashboard({ usuario, onSalir }) {
             </span>
             <button
               type="button"
-              onClick={cargarNotificacionesNavegacion}
+              onClick={() => abrirPreferencias()}
+              className="secondary-button !px-4 !py-2.5"
+            >
+              Preferencias
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPanelNotificacionesAbierto((abierto) => !abierto);
+                cargarNotificacionesNavegacion();
+              }}
+              aria-expanded={panelNotificacionesAbierto}
               className="secondary-button !px-4 !py-2.5"
             >
               Notificaciones
-              {notificacionesNavegacion.length > 0 && (
+              {notificacionesPendientes.length > 0 && (
                 <span className="ml-2 rounded-full bg-[#1268e8] px-2 py-0.5 text-xs text-white">
-                  {notificacionesNavegacion.length}
+                  {notificacionesPendientes.length}
                 </span>
               )}
             </button>
@@ -756,27 +908,123 @@ export default function Dashboard({ usuario, onSalir }) {
             </button>
           </div>
         </div>
+        {panelNotificacionesAbierto && (
+          <div
+            role="region"
+            aria-label="Bandeja de notificaciones"
+            className="border-t border-slate-100 bg-white px-5 py-4 shadow-lg lg:px-8"
+          >
+            <div className="mx-auto max-w-7xl">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-bold">Bandeja de notificaciones</p>
+                  <p className="text-xs text-slate-400">
+                    {notificacionesNavegacion.length} en total · {notificacionesPendientes.length} sin leer
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={cargarNotificacionesNavegacion}
+                    className="secondary-button !px-3 !py-2 !text-xs"
+                  >
+                    Actualizar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={marcarTodasNotificacionesLeidas}
+                    disabled={notificacionesPendientes.length === 0}
+                    className="secondary-button !px-3 !py-2 !text-xs disabled:opacity-50"
+                  >
+                    Marcar todas como leídas
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPanelNotificacionesAbierto(false)}
+                    className="secondary-button !px-3 !py-2 !text-xs"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              </div>
+              <div className="mt-3 max-h-72 space-y-2 overflow-y-auto">
+                {notificacionesNavegacion.length === 0 ? (
+                  <p className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                    No tienes notificaciones por ahora.
+                  </p>
+                ) : (
+                  notificacionesNavegacion.map((notificacion) => (
+                    <div
+                      key={notificacion._id}
+                      className={`rounded-xl border p-3 ${
+                        notificacion.leida
+                          ? 'border-slate-200 bg-slate-50'
+                          : 'border-blue-200 bg-blue-50'
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-wider text-[#1268e8]">
+                            {notificacion.asunto || 'Notificación'}
+                          </p>
+                          <p className="mt-1 text-sm text-slate-700">{notificacion.mensaje}</p>
+                          <p className="mt-1 text-xs text-slate-400">
+                            {notificacion.fechaEnvio
+                              ? new Date(notificacion.fechaEnvio).toLocaleString()
+                              : 'Fecha no disponible'}{' '}
+                            · Canal: navegación
+                          </p>
+                        </div>
+                        {!notificacion.leida && (
+                          <button
+                            type="button"
+                            onClick={() => marcarNotificacionLeida(notificacion._id)}
+                            className="rounded-lg bg-[#1268e8] px-3 py-1.5 text-xs font-bold text-white"
+                          >
+                            Marcar leída
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </header>
 
-      {notificacionActiva && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="fixed right-5 top-24 z-50 w-[min(22rem,calc(100vw-2.5rem))] rounded-2xl border border-blue-200 bg-white p-4 shadow-xl"
-        >
-          <p className="text-xs font-bold uppercase tracking-wider text-[#1268e8]">
-            {notificacionActiva.asunto || 'Notificación'}
-          </p>
-          <p className="mt-1 text-sm text-slate-700">{notificacionActiva.mensaje}</p>
-          <div className="mt-3 flex items-center justify-between gap-3">
-            <span className="text-xs text-slate-400">Canal: navegación</span>
-            <button
-              type="button"
-              onClick={cerrarNotificacionNavegacion}
-              className="rounded-lg bg-[#1268e8] px-3 py-1.5 text-xs font-bold text-white"
-            >
-              Entendido
-            </button>
+      {modalPreferencias && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/40 px-4">
+          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <h2 className="text-xl font-bold">Preferencias del recordatorio</h2>
+            <p className="mt-1 text-xs text-slate-400">
+              {usuarioPreferencias
+                ? `Editando las preferencias de ${usuarioPreferencias.correo}.`
+                : 'Estas preferencias aplican a tus reservas.'}
+            </p>
+            <div className="mt-5">
+              <ControlesPreferencias
+                valor={preferenciasRecordatorio}
+                onChange={setPreferenciasRecordatorio}
+              />
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setModalPreferencias(false)}
+                className="secondary-button !px-4 !py-2.5"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={guardarPreferencias}
+                className="primary-button !px-4 !py-2.5"
+              >
+                Guardar
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1361,6 +1609,17 @@ export default function Dashboard({ usuario, onSalir }) {
                             </select>
                           </div>
                         </div>
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                          <p className="mb-3 text-xs font-bold text-slate-600">
+                            Preferencias del recordatorio
+                          </p>
+                          <ControlesPreferencias
+                            valor={formUsuario.preferenciasRecordatorio}
+                            onChange={(preferencias) =>
+                              setFormUsuario({ ...formUsuario, preferenciasRecordatorio: preferencias })
+                            }
+                          />
+                        </div>
                         <button type="submit" className="primary-button !py-2.5 text-sm">
                           Crear cuenta con rol
                         </button>
@@ -1387,9 +1646,18 @@ export default function Dashboard({ usuario, onSalir }) {
                             className="flex items-center justify-between py-2.5 text-sm"
                           >
                             <span className="font-medium">{u.correo}</span>
-                            <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-[#1268e8]">
-                              {u.rol}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-[#1268e8]">
+                                {u.rol}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => abrirPreferencias(u)}
+                                className="text-xs font-bold text-[#1268e8] underline"
+                              >
+                                Preferencias
+                              </button>
+                            </div>
                           </div>
                         ))}
                       </div>

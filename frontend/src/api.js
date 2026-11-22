@@ -58,10 +58,10 @@ export const auth = {
       method: 'POST',
       body: JSON.stringify({ correo, password }),
     }),
-  registro: (correo, password, telefono = '') =>
+  registro: (correo, password, telefono = '', preferenciasRecordatorio) =>
     peticion('/auth/registro', {
       method: 'POST',
-      body: JSON.stringify({ correo, password, telefono }),
+      body: JSON.stringify({ correo, password, telefono, preferenciasRecordatorio }),
     }),
   perfil: () => peticion('/auth/perfil'),
 };
@@ -174,6 +174,21 @@ export const notificacionesApi = {
     peticion('/notificaciones/resumen-instructor', {
       method: 'POST',
       body: JSON.stringify({ instructorId }),
+    }),
+};
+
+export const preferenciasApi = {
+  mias: () => peticion('/mi-perfil/preferencias-recordatorio'),
+  guardarMias: (preferenciasRecordatorio) =>
+    peticion('/mi-perfil/preferencias-recordatorio', {
+      method: 'PUT',
+      body: JSON.stringify({ preferenciasRecordatorio }),
+    }),
+  deUsuario: (id) => peticion(`/usuarios/${id}/preferencias-recordatorio`),
+  guardarDeUsuario: (id, preferenciasRecordatorio) =>
+    peticion(`/usuarios/${id}/preferencias-recordatorio`, {
+      method: 'PUT',
+      body: JSON.stringify({ preferenciasRecordatorio }),
     }),
 };
 
