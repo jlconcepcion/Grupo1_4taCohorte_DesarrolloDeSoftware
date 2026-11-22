@@ -13,8 +13,10 @@ Las suites de pruebas automatizadas del proyecto se ejecutan con **Jest + Supert
 | [coordinador.test.js](../backend/tests/coordinador.test.js) | Verificación de permisos autorizados y denegados para el rol coordinador | `ST01.05`, `ST01.08` |
 | [sprint2_recintos_horarios.test.js](../backend/tests/sprint2_recintos_horarios.test.js) | CRUD de recintos, clases en recintos activos, validación de horarios, rechazo de bloques solapados, auditoría de coordinador y bloqueo de eliminación con reservas activas | `HU04` – `HU09`, `ST02.01` – `ST02.11` |
 | [sprint3_reservas.test.js](../backend/tests/sprint3_reservas.test.js) | Disponibilidad, fechas inválidas/pasadas, RBAC, reserva con control de concurrencia, confirmación/cancelación, idempotencia, reasignación con cliente destino y flujo E2E | `HU10` – `HU17`, `ST03.01` – `ST03.11` |
+| [sprint4_notificaciones.test.js](../backend/tests/sprint4_notificaciones.test.js) | Envío multi-canal con fallo parcial, idempotencia, token público de asistencia, auditoría, reenvío, resumen del instructor y notificación de navegación al crear usuario | `HU04`, `ST04.01` – `ST04.06`, `ST04.09` – `ST04.14` |
+| [sprint4_reportes.test.js](../backend/tests/sprint4_reportes.test.js) | Exportación CSV con filtros, validación de estado y RBAC del reporte | `ST04.07` |
 
-**Total vigente:** 7 suites / 64 pruebas. Las pruebas usan mocks; no requieren MongoDB Atlas.
+**Total vigente:** 9 suites / 80 pruebas. Las pruebas usan mocks; no requieren MongoDB Atlas.
 
 ## Ejecución
 

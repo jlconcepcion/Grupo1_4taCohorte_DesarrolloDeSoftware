@@ -74,6 +74,22 @@ const reservaSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    recordatorioEnviado: {
+      type: Boolean,
+      default: false,
+    },
+    tokenConfirmacion: {
+      type: String,
+      default: null,
+    },
+    tokenExpiraEn: {
+      type: Date,
+      default: null,
+    },
+    tokenUsadoEn: {
+      type: Date,
+      default: null,
+    },
     historialCambios: {
       type: [cambioReservaSchema],
       default: [],

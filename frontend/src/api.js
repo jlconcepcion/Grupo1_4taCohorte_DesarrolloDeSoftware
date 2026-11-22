@@ -58,10 +58,10 @@ export const auth = {
       method: 'POST',
       body: JSON.stringify({ correo, password }),
     }),
-  registro: (correo, password) =>
+  registro: (correo, password, telefono = '') =>
     peticion('/auth/registro', {
       method: 'POST',
-      body: JSON.stringify({ correo, password }),
+      body: JSON.stringify({ correo, password, telefono }),
     }),
   perfil: () => peticion('/auth/perfil'),
 };
@@ -157,4 +157,40 @@ export const reservasApi = {
     }),
   conteoInstructor: (filtros = {}) =>
     peticion(`/reservas/conteo-instructor${armarQuery(filtros)}`),
+};
+
+export const notificacionesApi = {
+  listar: (filtros = {}) => peticion(`/notificaciones${armarQuery(filtros)}`),
+  mias: () => peticion('/notificaciones/mias'),
+  marcarLeida: (id) =>
+    peticion(`/notificaciones/${id}/leida`, {
+      method: 'PATCH',
+    }),
+  reenviar: (id) =>
+    peticion(`/notificaciones/${id}/reenviar`, {
+      method: 'POST',
+    }),
+  resumenInstructor: (instructorId) =>
+    peticion('/notificaciones/resumen-instructor', {
+      method: 'POST',
+      body: JSON.stringify({ instructorId }),
+    }),
+};
+
+export const reportesApi = {
+  descargarReservasCsv: async (filtros = {}) => {
+    const headers = {};
+    const token = getToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    const respuesta = await fetch(
+      `/api/reportes/reservas.csv${armarQuery(filtros)}`,
+      { headers }
+    );
+    if (!respuesta.ok) {
+      const datos = await respuesta.json().catch(() => ({}));
+      throw new Error(datos.mensaje || 'No se pudo descargar el reporte CSV');
+    }
+    return respuesta.blob();
+  },
 };

@@ -18,4 +18,7 @@ La fuente de verdad es `backend/src/config/permisos.js`.
 | Enviar sugerencias | ✔ | | | |
 | Ver sugerencias | | ✔ | | ✔ |
 | Ver reportes | | ✔ | | ✔ |
+| Ver notificaciones propias de navegación | ✔ | ✔ | ✔ | ✔ |
+| Ver auditoría de notificaciones | | ✔ | | ✔ |
+| Reenviar notificaciones y enviar resúmenes | | ✔ | | ✔ |
 | Ver indicadores | | | | ✔ |

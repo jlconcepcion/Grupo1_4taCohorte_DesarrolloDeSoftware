@@ -8,6 +8,15 @@ const userSchema = new mongoose.Schema(
     password: { type: String, required: true },
     rol: { type: String, enum: ROLES, default: 'cliente' },
     activo: { type: Boolean, default: true },
+    telefono: {
+      type: String,
+      trim: true,
+      default: '',
+      validate: {
+        validator: (valor) => !valor || /^\+?[1-9]\d{1,14}$/.test(valor),
+        message: 'El teléfono debe estar en formato E.164',
+      },
+    },
   },
   { timestamps: true }
 );

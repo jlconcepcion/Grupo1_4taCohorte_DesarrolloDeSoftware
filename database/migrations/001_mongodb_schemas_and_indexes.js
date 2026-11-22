@@ -17,7 +17,8 @@ const MONGODB_SCHEMAS = {
             bsonType: 'string',
             enum: ['cliente', 'coordinador', 'instructor', 'administrador']
           },
-          activo: { bsonType: 'bool' }
+          activo: { bsonType: 'bool' },
+          telefono: { bsonType: 'string', pattern: '^(\\+?[1-9][0-9]{1,14})?$' }
         }
       }
     },
@@ -110,7 +111,9 @@ const MONGODB_SCHEMAS = {
           fechaCancelacion: { bsonType: ['date', 'null'] },
           motivoCancelacion: { bsonType: ['string', 'null'] },
           recordatorioEnviado: { bsonType: ['bool', 'null'] },
-          tokenConfirmacion: { bsonType: ['string', 'null'] }
+          tokenConfirmacion: { bsonType: ['string', 'null'] },
+          tokenExpiraEn: { bsonType: ['date', 'null'] },
+          tokenUsadoEn: { bsonType: ['date', 'null'] }
         }
       }
     },
@@ -128,6 +131,37 @@ const MONGODB_SCHEMAS = {
       },
       { key: { bloque: 1, fecha: 1, estado: 1 }, options: { name: 'idx_reservas_ocupacion_bloque' } },
       { key: { fecha: 1, recinto: 1, estado: 1 }, options: { name: 'idx_reservas_busqueda' } }
+    ]
+  },
+
+  notificaciones: {
+    validator: {
+      $jsonSchema: {
+        bsonType: 'object',
+        required: ['tipo', 'canal', 'destino', 'estado'],
+        properties: {
+          reserva: { bsonType: ['objectId', 'null'] },
+          destinatario: { bsonType: ['objectId', 'null'] },
+          tipo: { bsonType: 'string', enum: ['recordatorio', 'resumen_instructor', 'sistema'] },
+          canal: { bsonType: 'string', enum: ['email', 'whatsapp', 'navegacion'] },
+          destino: { bsonType: 'string', minLength: 1 },
+          asunto: { bsonType: 'string' },
+          mensaje: { bsonType: 'string' },
+          estado: { bsonType: 'string', enum: ['enviado', 'fallido', 'omitido'] },
+          proveedorId: { bsonType: ['string', 'null'] },
+          error: { bsonType: ['string', 'null'] },
+          fechaEnvio: { bsonType: ['date', 'null'] },
+          leida: { bsonType: 'bool' }
+        }
+      }
+    },
+    indexes: [
+      { key: { destinatario: 1, leida: 1, createdAt: -1 }, options: { name: 'idx_notificaciones_usuario' } },
+      {
+        key: { reserva: 1, tipo: 1, canal: 1, estado: 1 },
+        options: { name: 'idx_notificaciones_idempotencia' }
+      },
+      { key: { createdAt: -1 }, options: { name: 'idx_notificaciones_recientes' } }
     ]
   },
 

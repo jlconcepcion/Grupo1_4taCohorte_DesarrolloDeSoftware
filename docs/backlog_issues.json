@@ -336,6 +336,54 @@
     "criterio": "Los tres casos pasan en la suite automatizada."
   },
   {
+    "id": "ST04.09",
+    "historia": "HU04",
+    "sprint": "Sprint 4",
+    "area": "Backend",
+    "subtarea": "Integrar WhatsApp Business/Twilio como segundo canal de recordatorios usando teléfonos en formato E.164.",
+    "criterio": "El recordatorio y su enlace de asistencia llegan al número registrado del cliente."
+  },
+  {
+    "id": "ST04.10",
+    "historia": "HU04",
+    "sprint": "Sprint 4",
+    "area": "Backend",
+    "subtarea": "Enviar por ambos canales con fallback: si falla uno, el otro continúa y solo se reintenta el canal fallido.",
+    "criterio": "Una reserva con correo y WhatsApp queda confirmada como notificada aunque un canal falle."
+  },
+  {
+    "id": "ST04.11",
+    "historia": "HU04",
+    "sprint": "Sprint 4",
+    "area": "Backend",
+    "subtarea": "Unificar la plantilla de correo y WhatsApp con recinto, fecha, hora y enlace firmado de confirmación.",
+    "criterio": "Ambos mensajes muestran la misma información de la reserva."
+  },
+  {
+    "id": "ST04.12",
+    "historia": "HU04",
+    "sprint": "Sprint 4",
+    "area": "BD",
+    "subtarea": "Auditar cada intento de envío en la colección notificaciones con canal, destino, estado, proveedorId y error.",
+    "criterio": "Coordinación puede consultar el historial y reenviar únicamente los intentos fallidos."
+  },
+  {
+    "id": "ST04.13",
+    "historia": "HU04",
+    "sprint": "Sprint 4",
+    "area": "Pruebas",
+    "subtarea": "Ampliar la suite con fallo parcial de canales, idempotencia por canal, token de un solo uso, reenvío y resumen del instructor.",
+    "criterio": "Las nuevas suites pasan junto con las existentes sin conexión a MongoDB Atlas."
+  },
+  {
+    "id": "ST04.14",
+    "historia": "HU04",
+    "sprint": "Sprint 4",
+    "area": "Frontend",
+    "subtarea": "Añadir canal de notificación por navegación: aviso persistido para el usuario, visible al entrar al Dashboard y al cambiar de pestaña, sin depender de SMTP ni Twilio.",
+    "criterio": "Al crear un usuario aparece un aviso en navegación para el administrador y, al iniciar sesión el nuevo usuario, aparece su aviso de bienvenida."
+  },
+  {
     "id": "ST05.01",
     "historia": "HU05",
     "sprint": "Sprint 4",

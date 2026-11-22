@@ -7,10 +7,30 @@ const Clase = require('../models/Clase');
 const BloqueDisponibilidad = require('../models/BloqueDisponibilidad');
 
 const USUARIOS = [
-  { correo: 'admin@gym.com', password: 'Admin12345', rol: 'administrador' },
-  { correo: 'coordinador@gym.com', password: 'Coord12345', rol: 'coordinador' },
-  { correo: 'instructor@gym.com', password: 'Instructor12345', rol: 'instructor' },
-  { correo: 'cliente@gym.com', password: 'Cliente12345', rol: 'cliente' },
+  {
+    correo: 'admin@gym.com',
+    password: 'Admin12345',
+    rol: 'administrador',
+    telefono: '+573000000001',
+  },
+  {
+    correo: 'coordinador@gym.com',
+    password: 'Coord12345',
+    rol: 'coordinador',
+    telefono: '+573000000002',
+  },
+  {
+    correo: 'instructor@gym.com',
+    password: 'Instructor12345',
+    rol: 'instructor',
+    telefono: '+573000000003',
+  },
+  {
+    correo: 'cliente@gym.com',
+    password: 'Cliente12345',
+    rol: 'cliente',
+    telefono: '+573000000004',
+  },
 ];
 
 const RECINTOS_BASE = [
