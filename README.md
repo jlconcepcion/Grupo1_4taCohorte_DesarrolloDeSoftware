@@ -47,7 +47,7 @@ Aplicación web para la gestión integral de reservas de canchas deportivas y cl
 - **Sprint 1 (Completado):** Tareas transversales (`TR.01` – `TR.04`) y **Épica 1 · Autenticación y usuarios (`HU01` – `HU03` / `ST01.01` – `ST01.08`)**.
 - **Sprint 2 (Completado):** **Épica 2 · Gestión de recintos y horarios (`HU04` – `HU09` / `ST02.01` – `ST02.11`)**.
 - **Sprint 3 (Completado):** **Épica 3 · Reservas (`HU10` – `HU17` / `ST03.01` – `ST03.11`)**, con cierre de concurrencia, fechas, índices y reasignación.
-- **Sprint 4 (Pendiente):** **Épica 4 · Notificaciones** y **Épica 5 · Sugerencias de los clientes**.
+- **Sprint 4 (En curso):** **Épica 4 · Notificaciones multi-canal (`HU04` / `ST04.01`–`ST04.14`)**. La Épica 5 · Sugerencias (`HU05`) queda pendiente.
 
 ---
 
@@ -174,18 +174,26 @@ Disponible en http://localhost:5173 (Vite redirige `/api` al backend en el puert
 | `PATCH` | `/api/reservas/:id/cancelar` | Cancelar reserva con motivo opcional y liberar cupo (`HU17`, `ST03.08`) | `coordinador`, `administrador` |
 | `PATCH` | `/api/reservas/:id/reasignar` | Editar / reasignar reserva (`ST03.10`) | `administrador` |
 | `GET` | `/api/reservas/conteo-instructor` | Conteo de reservas y confirmadas por clase y horario (`ST03.09`) | `instructor`, `coordinador`, `administrador` |
+| `GET` | `/api/notificaciones/confirmar-asistencia?token=...` | Confirma asistencia desde el enlace firmado del recordatorio (`HU04`, `ST04.04`) | Público |
+| `GET` | `/api/notificaciones` | Consulta historial de notificaciones (`ST04.12`) | `coordinador`, `administrador` |
+| `GET` | `/api/notificaciones/mias` | Consulta notificaciones de navegación propias (`ST04.14`) | Todos los roles autenticados |
+| `PATCH` | `/api/notificaciones/:id/leida` | Marca como leída una notificación de navegación propia (`ST04.14`) | Todos los roles autenticados |
+| `POST` | `/api/notificaciones/:id/reenviar` | Reenvía solo el canal fallido (`ST04.10`) | `coordinador`, `administrador` |
+| `POST` | `/api/notificaciones/resumen-instructor` | Envía el conteo de reservas del instructor (`ST04.06`) | `coordinador`, `administrador` |
+| `GET` | `/api/reportes/reservas.csv` | Descarga el listado filtrado de reservas en CSV (`ST04.07`) | `coordinador`, `administrador` |
 
 ---
 
 ## Pruebas Automatizadas y Documentación
 
 ```bash
-cd backend && npm test -- --runInBand   # 7 suites / 64 pruebas en Jest + Supertest (Sprints 1-3)
+cd backend && npm test -- --runInBand   # 9 suites / 80 pruebas en Jest + Supertest (Sprints 1-4)
 cd frontend && npm run build            # Verificación de compilación de React + Vite
 ```
 
 Las pruebas de backend usan mocks y no se conectan a MongoDB Atlas.
 
 - **Modelo Entidad-Relación (`TR.03`):** [docs/modelo_entidad_relacion.md](./docs/modelo_entidad_relacion.md)
+- **Plan del Sprint 4 (`HU04`):** [docs/plan_sprint4_notificaciones.md](./docs/plan_sprint4_notificaciones.md)
 - **Matriz de Permisos por Rol (`ST01.05`):** [docs/permisos.md](./docs/permisos.md)
 - **Guía de Contribución (`TR.01.06`):** [CONTRIBUTING.md](./CONTRIBUTING.md)

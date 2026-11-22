@@ -5,6 +5,9 @@ const BloqueDisponibilidad = require('../models/BloqueDisponibilidad');
 const Recinto = require('../models/Recinto');
 const Clase = require('../models/Clase');
 const User = require('../models/User');
+const {
+  registrarNotificacionNavegacion,
+} = require('../services/notificaciones.service');
 
 const FECHA_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const colasPorCupo = new Map();
@@ -474,6 +477,65 @@ async function confirmarAsistenciaCliente(req, res) {
   }
 }
 
+async function notificarCancelacion(reserva, actor) {
+  const clienteId = reserva?.cliente?._id || reserva?.cliente;
+  const clienteCorreo = reserva?.cliente?.correo || 'el cliente';
+  const actorId = actor?.id || actor?._id;
+  let actorCorreo = actor?.correo;
+  let actorRol = actor?.rol;
+
+  if (!actorCorreo && actorId && typeof User.findById === 'function') {
+    try {
+      let consulta = User.findById(actorId);
+      if (consulta && typeof consulta.select === 'function') {
+        consulta = consulta.select('correo rol');
+      }
+      const usuario = await consulta;
+      actorCorreo = usuario?.correo;
+      actorRol = usuario?.rol;
+    } catch (err) {
+      actorCorreo = null;
+    }
+  }
+
+  const responsable = actorCorreo || actorRol || 'un administrador';
+  const clase = reserva?.clase?.nombre || 'la clase';
+  const fecha = reserva?.fecha || '';
+  const motivo = reserva?.motivoCancelacion
+    ? ` Motivo: ${reserva.motivoCancelacion}.`
+    : '';
+  const referencia = `${clase}${fecha ? ` del ${fecha}` : ''}`;
+  const destinatarios = new Map();
+
+  if (clienteId) {
+    const cancellationBySelf = String(clienteId) === String(actorId);
+    destinatarios.set(String(clienteId), {
+      asunto: 'Reserva cancelada',
+      mensaje: cancellationBySelf
+        ? `Cancelaste tu reserva de ${referencia}.${motivo}`
+        : `Tu reserva de ${referencia} fue cancelada por ${responsable}.${motivo}`,
+    });
+  }
+
+  if (actorId && !destinatarios.has(String(actorId))) {
+    destinatarios.set(String(actorId), {
+      asunto: 'Cancelación registrada',
+      mensaje: `Cancelaste la reserva de ${clienteCorreo} para ${referencia}.${motivo}`,
+    });
+  }
+
+  await Promise.all(
+    [...destinatarios].map(([destinatario, contenido]) =>
+      registrarNotificacionNavegacion({
+        destinatario,
+        asunto: contenido.asunto,
+        mensaje: contenido.mensaje,
+        reserva: reserva?._id || null,
+      }).catch(() => null)
+    )
+  );
+}
+
 // ============================================================================
 // PATCH /api/reservas/:id/cancelar-propia (HU12, ST03.06)
 // ============================================================================
@@ -523,6 +585,7 @@ async function cancelarReservaPropia(req, res) {
 
     const bloqueId = reserva.bloque?._id || reserva.bloque;
     await sincronizarContadorBloque(bloqueId);
+    await notificarCancelacion(reserva, req.user);
 
     return res.json(reserva);
   } catch (err) {
@@ -657,6 +720,7 @@ async function cancelarReservaCoordinador(req, res) {
 
     const bloqueId = reserva.bloque?._id || reserva.bloque;
     await sincronizarContadorBloque(bloqueId);
+    await notificarCancelacion(reserva, req.user);
 
     return res.json(reserva);
   } catch (err) {

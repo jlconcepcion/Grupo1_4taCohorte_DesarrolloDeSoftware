@@ -3,9 +3,11 @@ import { auth } from '../api.js';
 import Icon from '../components/Icon.jsx';
 
 const CORREO_REGEX = /^\S+@\S+\.\S+$/;
+const TELEFONO_REGEX = /^\+?[1-9]\d{1,14}$/;
 
 export default function Registro({ onLogin, onIrALogin, onVolver }) {
   const [correo, setCorreo] = useState('');
+  const [telefono, setTelefono] = useState('');
   const [password, setPassword] = useState('');
   const [confirmacion, setConfirmacion] = useState('');
   const [errores, setErrores] = useState({});
@@ -17,6 +19,9 @@ export default function Registro({ onLogin, onIrALogin, onVolver }) {
     const nuevosErrores = {};
     if (!correo) nuevosErrores.correo = 'Ingresa tu correo';
     else if (!CORREO_REGEX.test(correo)) nuevosErrores.correo = 'Correo inválido';
+    if (telefono.trim() && !TELEFONO_REGEX.test(telefono.trim())) {
+      nuevosErrores.telefono = 'Usa formato E.164, por ejemplo +573001234567';
+    }
     if (!password) nuevosErrores.password = 'Ingresa una contraseña';
     else if (password.length < 8) {
       nuevosErrores.password = 'Debe tener al menos 8 caracteres';
@@ -30,7 +35,7 @@ export default function Registro({ onLogin, onIrALogin, onVolver }) {
 
     setEnviando(true);
     try {
-      const datos = await auth.registro(correo.trim(), password);
+      const datos = await auth.registro(correo.trim(), password, telefono.trim());
       onLogin(datos.token, datos.usuario);
     } catch (error) {
       setErrores({ general: error.message });
@@ -81,6 +86,28 @@ export default function Registro({ onLogin, onIrALogin, onVolver }) {
                 {errores.correo && (
                   <span className="mt-1 block text-xs font-medium text-red-600">
                     {errores.correo}
+                  </span>
+                )}
+              </label>
+
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold text-slate-700">
+                  WhatsApp (opcional)
+                </span>
+                <input
+                  type="tel"
+                  value={telefono}
+                  onChange={(e) => setTelefono(e.target.value)}
+                  placeholder="+573001234567"
+                  autoComplete="tel"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 outline-none transition focus:border-[#1268e8] focus:bg-white focus:ring-4 focus:ring-blue-100"
+                />
+                <span className="mt-1 block text-xs text-slate-400">
+                  Recibirás el recordatorio y el enlace de asistencia por este número.
+                </span>
+                {errores.telefono && (
+                  <span className="mt-1 block text-xs font-medium text-red-600">
+                    {errores.telefono}
                   </span>
                 )}
               </label>

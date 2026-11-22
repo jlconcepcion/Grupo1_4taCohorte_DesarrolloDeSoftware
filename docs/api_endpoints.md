@@ -1,4 +1,4 @@
-# Catálogo Completo de Endpoints de la API REST (`Sprints 1, 2 y 3`)
+# Catálogo Completo de Endpoints de la API REST (`Sprints 1, 2, 3 y 4`)
 
 **URL Base del Backend (directo):** `http://localhost:3000/api`  
 **URL Base vía Proxy del Frontend:** `http://localhost:8080/api`  
@@ -19,6 +19,9 @@
    - `backend/src/routes/clases.routes.js`
    - `backend/src/routes/bloques.routes.js`
    - `backend/src/routes/reservas.routes.js`
+   - `backend/src/routes/confirmacion.routes.js`
+   - `backend/src/routes/notificaciones.routes.js`
+   - `backend/src/routes/reportes.routes.js`
 4. **Controladores (`backend/src/controllers/`):**
    - `backend/src/controllers/auth.controller.js`
    - `backend/src/controllers/usuarios.controller.js`
@@ -26,6 +29,8 @@
    - `backend/src/controllers/clases.controller.js`
    - `backend/src/controllers/bloques.controller.js`
    - `backend/src/controllers/reservas.controller.js`
+   - `backend/src/controllers/notificaciones.controller.js`
+   - `backend/src/controllers/reportes.controller.js`
 
 ---
 
@@ -171,6 +176,7 @@
 
 ### `PATCH /api/reservas/:id/cancelar-propia` (`HU12`, `ST03.06`)
 - **Acceso:** `cliente` propietario de la reserva (antes del inicio del bloque; pasa a `cancelada`, conserva historial y libera el cupo).
+- **Notificación:** registra un aviso de navegación para el cliente confirmando la autocancelación.
 
 ### `GET /api/reservas` (`HU15`, `ST03.07`)
 - **Acceso:** `coordinador` y `administrador`
@@ -186,6 +192,7 @@
   ```json
   { "motivo": "Cliente no confirmó asistencia 1 hora antes" }
   ```
+- **Notificación:** registra avisos de navegación para el cliente (identificando a quien canceló e incluyendo el motivo) y para quien canceló.
 
 ### `PATCH /api/reservas/:id/reasignar` (`ST03.10`)
 - **Acceso:** Exclusivo `administrador`
@@ -203,3 +210,42 @@
 - **Acceso:** `instructor`, `coordinador` y `administrador`
 - **Query param opcional:** `?fecha=YYYY-MM-DD` (futura o de hoy).
 - **Respuesta:** Lista de bloques con `totalReservadas`, `confirmadas`, `pendientes`, `canceladas`, `cuposLibres` y `fechaFiltro`.
+
+---
+
+## 8. Notificaciones y Reportes (`Sprint 4`)
+
+### `GET /api/notificaciones/confirmar-asistencia?token=<token>` (`HU04`, `ST04.04`)
+- **Acceso:** Público; el token se obtiene del correo o WhatsApp de recordatorio.
+- **Comportamiento:** verifica firma, propósito `asistencia`, expiración, uso previo y que la clase aún no haya iniciado.
+- **Respuesta:** redirige a `FRONTEND_URL/?confirmar=ok|error&motivo=...`. Si `FRONTEND_URL` no está configurado, responde JSON con `{ ok, mensaje }`.
+- **Nota:** este enlace permite confirmar hasta el inicio de la clase porque el recordatorio se envía 1 hora antes; la confirmación manual desde la app mantiene la regla de 1 hora de `HU14`.
+
+### `GET /api/notificaciones` (`ST04.12`)
+- **Acceso:** `coordinador` y `administrador`
+- **Query params opcionales:** `?reserva=`, `?canal=email|whatsapp|navegacion`, `?estado=enviado|fallido|omitido`, `?tipo=recordatorio|resumen_instructor|sistema`, `?limite=` (máximo 200).
+
+### `GET /api/notificaciones/mias` (`ST04.14`)
+- **Acceso:** cualquier roll autenticado.
+- **Respuesta:** hasta 20 notificaciones del canal `navegacion` dirigidas al usuario de la sesión, ordenadas por fecha descendente.
+
+### `PATCH /api/notificaciones/:id/leida` (`ST04.14`)
+- **Acceso:** cualquier roll autenticado, solo para notificaciones propias del canal `navegacion`.
+- **Respuesta:** notificación con `leida: true`.
+
+### `POST /api/notificaciones/:id/reenviar` (`ST04.10`)
+- **Acceso:** `coordinador` y `administrador`
+- **Comportamiento:** solo reenvía la notificación fallida u omitida de su canal original; rechaza reenviar una ya enviada.
+
+### `POST /api/notificaciones/resumen-instructor` (`ST04.06`)
+- **Acceso:** `coordinador` y `administrador`
+- **Body JSON:**
+  ```json
+  { "instructorId": "<id_usuario_instructor>" }
+  ```
+- **Respuesta:** `{ "resumen": { "pendientes", "confirmadas", "canceladas", "total" }, "resultados": [...] }`.
+
+### `GET /api/reportes/reservas.csv` (`ST04.07`)
+- **Acceso:** `coordinador` y `administrador`
+- **Query params opcionales:** los mismos de `GET /api/reservas` (`fecha`, `recinto`, `clase`, `instructor`, `estado`).
+- **Respuesta:** archivo `reservas.csv` con BOM UTF-8, columnas `fecha,horaInicio,horaFin,clase,instructor,recinto,cliente,correo,estado,fechaConfirmacion`.

@@ -8,6 +8,14 @@ import { auth, cerrarSesion, getToken, getUsuario, guardarSesion } from './api.j
 export default function App() {
   const [usuario, setUsuario] = useState(getUsuario);
   const [vista, setVista] = useState('landing');
+  const [avisoConfirmacion, setAvisoConfirmacion] = useState(() => {
+    const parametros = new URLSearchParams(window.location.search);
+    if (!parametros.has('confirmar')) return null;
+    return {
+      ok: parametros.get('confirmar') === 'ok',
+      mensaje: parametros.get('motivo') || '',
+    };
+  });
   const autenticado = Boolean(usuario && getToken());
 
   useEffect(() => {
@@ -23,6 +31,11 @@ export default function App() {
       });
   }, []);
 
+  useEffect(() => {
+    if (!avisoConfirmacion) return;
+    window.history.replaceState({}, '', window.location.pathname);
+  }, [avisoConfirmacion]);
+
   function iniciarSesion(token, datos) {
     guardarSesion(token, datos);
     setUsuario(datos);
@@ -34,12 +47,47 @@ export default function App() {
     setVista('landing');
   }
 
+  function conAviso(contenido) {
+    if (!avisoConfirmacion) return contenido;
+    return (
+      <>
+        <div
+          role="status"
+          aria-live="polite"
+          className={`fixed inset-x-0 top-4 z-50 mx-auto flex max-w-xl items-center gap-3 rounded-2xl border px-4 py-3 text-sm shadow-lg ${
+            avisoConfirmacion.ok
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+              : 'border-red-200 bg-red-50 text-red-800'
+          }`}
+        >
+          <span className="font-bold">
+            {avisoConfirmacion.ok ? 'Asistencia confirmada' : 'No se pudo confirmar'}
+          </span>
+          <span className="flex-1">
+            {avisoConfirmacion.mensaje ||
+              (avisoConfirmacion.ok
+                ? 'Tu asistencia quedó registrada.'
+                : 'El enlace de confirmación no es válido.')}
+          </span>
+          <button
+            type="button"
+            onClick={() => setAvisoConfirmacion(null)}
+            className="font-bold underline"
+          >
+            Cerrar
+          </button>
+        </div>
+        {contenido}
+      </>
+    );
+  }
+
   if (autenticado) {
-    return <Dashboard usuario={usuario} onSalir={salir} />;
+    return conAviso(<Dashboard usuario={usuario} onSalir={salir} />);
   }
 
   if (vista === 'login') {
-    return (
+    return conAviso(
       <Login
         onLogin={iniciarSesion}
         onIrARegistro={() => setVista('registro')}
@@ -49,7 +97,7 @@ export default function App() {
   }
 
   if (vista === 'registro') {
-    return (
+    return conAviso(
       <Registro
         onLogin={iniciarSesion}
         onIrALogin={() => setVista('login')}
@@ -58,7 +106,7 @@ export default function App() {
     );
   }
 
-  return (
+  return conAviso(
     <Landing
       onIniciarSesion={() => setVista('login')}
       onCrearCuenta={() => setVista('registro')}

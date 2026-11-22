@@ -6,6 +6,8 @@ import {
   clasesApi,
   bloquesApi,
   reservasApi,
+  reportesApi,
+  notificacionesApi,
 } from '../api.js';
 
 const DIAS_SEMANA = [
@@ -155,6 +157,8 @@ export default function Dashboard({ usuario, onSalir }) {
   const [cargando, setCargando] = useState(true);
   const [mensajeExito, setMensajeExito] = useState('');
   const [mensajeError, setMensajeError] = useState('');
+  const [notificacionesNavegacion, setNotificacionesNavegacion] = useState([]);
+  const [notificacionActiva, setNotificacionActiva] = useState(null);
 
   // Estado para formulario de Recintos (HU04 / HU05 - Administrador)
   const [formRecinto, setFormRecinto] = useState({
@@ -169,6 +173,7 @@ export default function Dashboard({ usuario, onSalir }) {
   const [formUsuario, setFormUsuario] = useState({
     correo: '',
     password: '',
+    telefono: '',
     rol: 'cliente',
   });
 
@@ -254,6 +259,31 @@ export default function Dashboard({ usuario, onSalir }) {
     const inicio = construirFechaHoraLocal(reserva.fecha, reserva.bloque?.horaInicio);
     if (!inicio) return false;
     return inicio.getTime() - Date.now() >= 60 * 60 * 1000;
+  }
+
+  async function cargarNotificacionesNavegacion() {
+    try {
+      const lista = await notificacionesApi.mias();
+      const pendientes = (Array.isArray(lista) ? lista : []).filter(
+        (notificacion) => !notificacion.leida
+      );
+      setNotificacionesNavegacion(pendientes);
+      setNotificacionActiva((actual) => actual || pendientes[0] || null);
+    } catch {
+      setNotificacionesNavegacion([]);
+    }
+  }
+
+  async function cerrarNotificacionNavegacion() {
+    const notificacion = notificacionActiva;
+    setNotificacionActiva(null);
+    setNotificacionesNavegacion((lista) => lista.filter((item) => item._id !== notificacion?._id));
+    if (!notificacion?._id) return;
+    try {
+      await notificacionesApi.marcarLeida(notificacion._id);
+    } catch {
+      setMensajeError('No se pudo marcar la notificación como leída');
+    }
   }
 
   async function cargarDatos() {
@@ -351,6 +381,38 @@ export default function Dashboard({ usuario, onSalir }) {
     filtroConteoFecha,
   ]);
 
+  useEffect(() => {
+    cargarNotificacionesNavegacion();
+  }, [
+    usuario?._id,
+    vistaAdmin,
+    vistaCoordinador,
+    vistaInstructor,
+    vistaCliente,
+  ]);
+
+  async function descargarReporteCsv() {
+    limpiarAvisos();
+    try {
+      const archivo = await reportesApi.descargarReservasCsv({
+        fecha: filtroResFecha,
+        recinto: filtroResRecinto,
+        clase: filtroResClase,
+        instructor: filtroResInstructor,
+        estado: filtroResEstado,
+      });
+      const url = URL.createObjectURL(archivo);
+      const enlace = document.createElement('a');
+      enlace.href = url;
+      enlace.download = 'reservas.csv';
+      enlace.click();
+      URL.revokeObjectURL(url);
+      setMensajeExito('Reporte CSV descargado correctamente.');
+    } catch (err) {
+      setMensajeError(err.message || 'No se pudo descargar el reporte CSV');
+    }
+  }
+
   const recintosActivos = recintos.filter((r) => r.activo !== false);
   const recintoSeleccionado = recintos.find(
     (r) => String(r._id) === String(formBloque.recinto)
@@ -433,8 +495,9 @@ export default function Dashboard({ usuario, onSalir }) {
     try {
       await usuariosApi.crear(formUsuario);
       setMensajeExito(`Cuenta creada para ${formUsuario.correo} con rol ${formUsuario.rol}.`);
-      setFormUsuario({ correo: '', password: '', rol: 'cliente' });
+      setFormUsuario({ correo: '', password: '', telefono: '', rol: 'cliente' });
       await cargarDatos();
+      await cargarNotificacionesNavegacion();
     } catch (err) {
       setMensajeError(err.errores?.join(' · ') || err.message);
     }
@@ -676,12 +739,47 @@ export default function Dashboard({ usuario, onSalir }) {
             <span className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-bold text-[#1268e8]">
               {rolInfo.nombre}
             </span>
+            <button
+              type="button"
+              onClick={cargarNotificacionesNavegacion}
+              className="secondary-button !px-4 !py-2.5"
+            >
+              Notificaciones
+              {notificacionesNavegacion.length > 0 && (
+                <span className="ml-2 rounded-full bg-[#1268e8] px-2 py-0.5 text-xs text-white">
+                  {notificacionesNavegacion.length}
+                </span>
+              )}
+            </button>
             <button onClick={onSalir} className="secondary-button !px-4 !py-2.5">
               Cerrar sesión
             </button>
           </div>
         </div>
       </header>
+
+      {notificacionActiva && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed right-5 top-24 z-50 w-[min(22rem,calc(100vw-2.5rem))] rounded-2xl border border-blue-200 bg-white p-4 shadow-xl"
+        >
+          <p className="text-xs font-bold uppercase tracking-wider text-[#1268e8]">
+            {notificacionActiva.asunto || 'Notificación'}
+          </p>
+          <p className="mt-1 text-sm text-slate-700">{notificacionActiva.mensaje}</p>
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <span className="text-xs text-slate-400">Canal: navegación</span>
+            <button
+              type="button"
+              onClick={cerrarNotificacionNavegacion}
+              className="rounded-lg bg-[#1268e8] px-3 py-1.5 text-xs font-bold text-white"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
 
       <section className="mx-auto max-w-7xl px-5 py-10 lg:px-8">
         <p className="section-kicker">Panel de {rolInfo.nombre}</p>
@@ -1213,6 +1311,20 @@ export default function Dashboard({ usuario, onSalir }) {
                               setFormUsuario({ ...formUsuario, correo: e.target.value })
                             }
                             placeholder="nuevo@gym.com"
+                            className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-600">
+                            WhatsApp (opcional, formato E.164)
+                          </label>
+                          <input
+                            type="tel"
+                            value={formUsuario.telefono}
+                            onChange={(e) =>
+                              setFormUsuario({ ...formUsuario, telefono: e.target.value })
+                            }
+                            placeholder="+573001234567"
                             className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
                           />
                         </div>
@@ -1771,6 +1883,13 @@ export default function Dashboard({ usuario, onSalir }) {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={descargarReporteCsv}
+                      className="rounded-xl bg-[#1268e8] px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-[#0d55b8]"
+                    >
+                      Descargar CSV
+                    </button>
                     <input
                       type="date"
                       value={filtroResFecha}
