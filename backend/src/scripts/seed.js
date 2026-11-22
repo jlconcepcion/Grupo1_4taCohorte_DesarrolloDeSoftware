@@ -5,6 +5,9 @@ const User = require('../models/User');
 const Recinto = require('../models/Recinto');
 const Clase = require('../models/Clase');
 const BloqueDisponibilidad = require('../models/BloqueDisponibilidad');
+const {
+  preferenciasRecordatorioPorDefecto,
+} = require('../config/notificaciones');
 
 const USUARIOS = [
   {
@@ -65,10 +68,14 @@ async function seed() {
     let usuario = await User.findOne({ correo: datos.correo });
 
     if (usuario) {
-      usuario.rol = datos.rol;
-      usuario.password = datos.password;
-      usuario.activo = true;
-      await usuario.save();
+        usuario.rol = datos.rol;
+        usuario.password = datos.password;
+        usuario.activo = true;
+        usuario.telefono = datos.telefono;
+        if (!usuario.preferenciasRecordatorio) {
+          usuario.preferenciasRecordatorio = preferenciasRecordatorioPorDefecto();
+        }
+        await usuario.save();
       console.log(`Actualizado: ${datos.correo} / ${datos.password} (${datos.rol})`);
     } else {
       usuario = await User.create(datos);

@@ -19,6 +19,8 @@ La fuente de verdad es `backend/src/config/permisos.js`.
 | Ver sugerencias | | ✔ | | ✔ |
 | Ver reportes | | ✔ | | ✔ |
 | Ver notificaciones propias de navegación | ✔ | ✔ | ✔ | ✔ |
+| Consultar y editar preferencias propias de recordatorio | ✔ | ✔ | ✔ | ✔ |
+| Consultar y editar preferencias de recordatorio de otros usuarios | | | | ✔ |
 | Ver auditoría de notificaciones | | ✔ | | ✔ |
 | Reenviar notificaciones y enviar resúmenes | | ✔ | | ✔ |
 | Ver indicadores | | | | ✔ |

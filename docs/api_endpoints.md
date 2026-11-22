@@ -53,9 +53,16 @@
   ```json
   {
     "correo": "carla@correo.com",
-    "password": "MiPassword123"
+    "password": "MiPassword123",
+    "telefono": "+573000000001",
+    "preferenciasRecordatorio": {
+      "activo": true,
+      "canales": ["email", "whatsapp", "navegacion"],
+      "minutosAnticipacion": null
+    }
   }
   ```
+- `telefono` y `preferenciasRecordatorio` son opcionales; por defecto se activan los tres canales y se usa la ventana global de 60 minutos.
 - **Respuestas:** `201 Created` (`{ usuario, token }`), `400 Bad Request`, `409 Conflict` (correo duplicado).
 
 ### `POST /api/auth/login` (`HU02`)
@@ -80,10 +87,36 @@
   {
     "correo": "pedro@gym.com",
     "password": "Instructor123",
-    "rol": "instructor"
+    "telefono": "+573000000002",
+    "rol": "instructor",
+    "preferenciasRecordatorio": {
+      "activo": true,
+      "canales": ["email", "navegacion"],
+      "minutosAnticipacion": 120
+    }
   }
   ```
 - **Respuestas:** `201 Created`, `400 Bad Request`, `403 Forbidden`, `409 Conflict`.
+
+### `GET /api/mi-perfil/preferencias-recordatorio` y `PUT /api/mi-perfil/preferencias-recordatorio` (`ST04.15`)
+- **Acceso:** cualquier usuario autenticado; solo puede consultar y editar sus propias preferencias.
+- **Body JSON (`PUT`):**
+  ```json
+  {
+    "preferenciasRecordatorio": {
+      "activo": true,
+      "canales": ["email", "whatsapp", "navegacion"],
+      "minutosAnticipacion": 60
+    }
+  }
+  ```
+- **Validación:** `activo` debe ser booleano, `canales` debe tener al menos un valor de `email|whatsapp|navegacion` y `minutosAnticipacion` debe ser `null` o un número entre `5` y `1440`.
+- **Respuestas:** `200 OK`, `400 Bad Request`, `401 Unauthorized`.
+
+### `GET /api/usuarios/:id/preferencias-recordatorio` y `PUT /api/usuarios/:id/preferencias-recordatorio` (`ST04.15`)
+- **Acceso:** exclusivo `administrador` (`403 Forbidden` para otros roles).
+- **Body JSON (`PUT`):** el mismo objeto `preferenciasRecordatorio` de la ruta self.
+- **Respuestas:** `200 OK`, `400 Bad Request`, `403 Forbidden`, `404 Not Found`.
 
 ---
 
@@ -214,6 +247,8 @@
 ---
 
 ## 8. Notificaciones y Reportes (`Sprint 4`)
+
+Los recordatorios respetan `preferenciasRecordatorio`: si `activo` es `false` no se envían; si un canal no está seleccionado se omite; `minutosAnticipacion` reemplaza la ventana global `NOTIFICACIONES_VENTANA_MIN` y extiende el TTL del enlace de confirmación. Cuando no queda ningún canal activo, se registra un intento `navegacion` con estado `omitido` y la reserva se marca como procesada.
 
 ### `GET /api/notificaciones/confirmar-asistencia?token=<token>` (`HU04`, `ST04.04`)
 - **Acceso:** Público; el token se obtiene del correo o WhatsApp de recordatorio.

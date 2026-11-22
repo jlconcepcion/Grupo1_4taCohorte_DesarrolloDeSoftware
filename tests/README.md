@@ -15,8 +15,9 @@ Las suites de pruebas automatizadas del proyecto se ejecutan con **Jest + Supert
 | [sprint3_reservas.test.js](../backend/tests/sprint3_reservas.test.js) | Disponibilidad, fechas inválidas/pasadas, RBAC, reserva con control de concurrencia, confirmación/cancelación, idempotencia, reasignación con cliente destino y flujo E2E | `HU10` – `HU17`, `ST03.01` – `ST03.11` |
 | [sprint4_notificaciones.test.js](../backend/tests/sprint4_notificaciones.test.js) | Envío multi-canal con fallo parcial, idempotencia, token público de asistencia, auditoría, reenvío, resumen del instructor y notificación de navegación al crear usuario | `HU04`, `ST04.01` – `ST04.06`, `ST04.09` – `ST04.14` |
 | [sprint4_reportes.test.js](../backend/tests/sprint4_reportes.test.js) | Exportación CSV con filtros, validación de estado y RBAC del reporte | `ST04.07` |
+| [sprint4_preferencias.test.js](../backend/tests/sprint4_preferencias.test.js) | Preferencias por usuario, canales activos, anticipación, TTL del token, APIs self/admin y RBAC | `ST04.15` |
 
-**Total vigente:** 9 suites / 80 pruebas. Las pruebas usan mocks; no requieren MongoDB Atlas.
+**Total vigente:** 10 suites / 85 pruebas. Las pruebas usan mocks; no requieren MongoDB Atlas.
 
 ## Ejecución
 

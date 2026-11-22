@@ -1,6 +1,10 @@
 const User = require('../models/User');
 const { ROLES } = require('../config/permisos');
 const {
+  preferenciasRecordatorioPorDefecto,
+  validarPreferenciasRecordatorio,
+} = require('../config/notificaciones');
+const {
   enviarBienvenida,
   registrarNotificacionNavegacion,
 } = require('../services/notificaciones.service');
@@ -19,7 +23,7 @@ async function listarUsuarios(req, res) {
 }
 
 async function crearUsuario(req, res) {
-  const { correo, password, rol, telefono = '' } = req.body || {};
+  const { correo, password, rol, telefono = '', preferenciasRecordatorio } = req.body || {};
   const telefonoNormalizado = String(telefono).trim();
 
   const errores = [];
@@ -29,12 +33,22 @@ async function crearUsuario(req, res) {
   if (telefonoNormalizado && !/^\+?[1-9]\d{1,14}$/.test(telefonoNormalizado)) {
     errores.push('El teléfono debe estar en formato E.164');
   }
+  const validacion = validarPreferenciasRecordatorio(
+    preferenciasRecordatorio ?? preferenciasRecordatorioPorDefecto()
+  );
+  errores.push(...validacion.errores);
   if (errores.length) {
     return res.status(400).json({ mensaje: 'Datos inválidos', errores });
   }
 
   try {
-    const usuario = await User.create({ correo, password, rol, telefono: telefonoNormalizado });
+    const usuario = await User.create({
+      correo,
+      password,
+      rol,
+      telefono: telefonoNormalizado,
+      preferenciasRecordatorio: validacion.preferencias,
+    });
 
     registrarNotificacionNavegacion({
       destinatario: usuario?._id,

@@ -1,5 +1,9 @@
 const Reserva = require('../models/Reserva');
-const { enviarRecordatorio, fechaHoraInicio } = require('../services/notificaciones.service');
+const {
+  enviarRecordatorio,
+  fechaHoraInicio,
+  minutosAnticipacionReserva,
+} = require('../services/notificaciones.service');
 
 function zonaHoraria() {
   return process.env.TZ || 'America/Bogota';
@@ -39,12 +43,13 @@ async function ejecutarRecordatorios() {
   const ahora = Date.now();
   const ventanaMinutos = Number(process.env.NOTIFICACIONES_VENTANA_MIN || 60);
   const toleranciaMinutos = Number(process.env.NOTIFICACIONES_TOLERANCIA_MIN || 5);
-  const objetivoMs = ventanaMinutos * 60 * 1000;
   const toleranciaMs = toleranciaMinutos * 60 * 1000;
 
   const candidatas = (Array.isArray(reservas) ? reservas : []).filter((reserva) => {
     const inicio = fechaHoraInicio(reserva);
     if (!inicio) return false;
+    const minutos = minutosAnticipacionReserva(reserva) ?? ventanaMinutos;
+    const objetivoMs = Number(minutos) * 60 * 1000;
     const diferencia = inicio.getTime() - ahora;
     return diferencia >= 0 && Math.abs(diferencia - objetivoMs) <= toleranciaMs;
   });

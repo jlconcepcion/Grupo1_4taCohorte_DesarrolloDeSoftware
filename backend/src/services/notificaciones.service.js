@@ -4,6 +4,10 @@ const mongoose = require('mongoose');
 const Reserva = require('../models/Reserva');
 const Notificacion = require('../models/Notificacion');
 const BloqueDisponibilidad = require('../models/BloqueDisponibilidad');
+const {
+  normalizarPreferenciasRecordatorio,
+  preferenciasRecordatorioPorDefecto,
+} = require('../config/notificaciones');
 const emailAdapter = require('./canales/email.adapter');
 const whatsappAdapter = require('./canales/whatsapp.adapter');
 
@@ -18,11 +22,11 @@ function secretoToken() {
   );
 }
 
-function generarTokenAsistencia(reserva) {
+function generarTokenAsistencia(reserva, opciones = {}) {
   return jwt.sign(
     { purpose: 'asistencia', reservaId: String(reserva?._id || '') },
     secretoToken(),
-    { expiresIn: process.env.NOTIFICACION_TOKEN_TTL || '2h' }
+    { expiresIn: opciones.expiresIn || process.env.NOTIFICACION_TOKEN_TTL || '2h' }
   );
 }
 
@@ -74,6 +78,27 @@ function tokenValido(token) {
   } catch {
     return null;
   }
+}
+
+function obtenerPreferenciasRecordatorio(cliente) {
+  const valor = cliente?.preferenciasRecordatorio || cliente;
+  const preferencias = normalizarPreferenciasRecordatorio(valor);
+  const tienePreferencias = Boolean(cliente?.preferenciasRecordatorio);
+
+  if (!tienePreferencias && cliente && typeof cliente === 'object') {
+    return preferenciasRecordatorioPorDefecto();
+  }
+  return preferencias;
+}
+
+function ttlTokenRecordatorio(minutosAnticipacion) {
+  if (!minutosAnticipacion) return process.env.NOTIFICACION_TOKEN_TTL || '2h';
+  return `${Math.ceil((Number(minutosAnticipacion) + 120) / 60)}h`;
+}
+
+function minutosAnticipacionReserva(reserva) {
+  const preferencias = obtenerPreferenciasRecordatorio(reserva?.cliente);
+  return preferencias.minutosAnticipacion;
 }
 
 async function persistirReserva(reserva) {
@@ -130,8 +155,12 @@ function construirDatosCanales(reserva, token) {
     enlace
   )}">Confirmar asistencia</a></p>`;
 
+  const preferencias = obtenerPreferenciasRecordatorio(cliente);
+  if (!preferencias.activo) return [];
+  const habilitados = new Set(preferencias.canales);
   const canales = [];
-  if (cliente.correo) {
+
+  if (habilitados.has('email') && cliente.correo) {
     canales.push({
       canal: 'email',
       destino: cliente.correo,
@@ -141,12 +170,23 @@ function construirDatosCanales(reserva, token) {
       adapter: emailAdapter,
     });
   }
-  if (cliente.telefono) {
+  if (habilitados.has('whatsapp') && cliente.telefono) {
     canales.push({
       canal: 'whatsapp',
       destino: cliente.telefono,
       mensaje: texto,
       adapter: whatsappAdapter,
+    });
+  }
+  if (habilitados.has('navegacion') && (cliente._id || cliente)) {
+    canales.push({
+      canal: 'navegacion',
+      destino: String(cliente._id || cliente),
+      asunto,
+      mensaje: texto,
+      adapter: {
+        enviar: async () => ({ estado: 'enviado', proveedorId: null }),
+      },
     });
   }
   return canales;
@@ -164,10 +204,13 @@ async function enviarRecordatorio(reserva, opciones = {}) {
     };
   }
 
+  const minutosAnticipacion = minutosAnticipacionReserva(reserva);
   let token = reserva.tokenConfirmacion;
   let payload = tokenValido(token);
   if (!payload) {
-    token = generarTokenAsistencia(reserva);
+    token = generarTokenAsistencia(reserva, {
+      expiresIn: ttlTokenRecordatorio(minutosAnticipacion),
+    });
     payload = verificarTokenAsistencia(token);
   }
 
@@ -177,13 +220,30 @@ async function enviarRecordatorio(reserva, opciones = {}) {
 
   const canales = construirDatosCanales(reserva, token);
   if (!canales.length) {
+    await registrarNotificacion({
+      reserva: reserva._id,
+      destinatario: reserva.cliente?._id || reserva.cliente || null,
+      tipo: TIPO_RECORDATORIO,
+      canal: 'navegacion',
+      destino: String(reserva.cliente?._id || reserva.cliente || ''),
+      asunto: `Recordatorio de ${reserva.clase?.nombre || 'tu clase'}`,
+      mensaje: 'El usuario no tiene canales de recordatorio activos o datos de contacto',
+      estado: 'omitido',
+      error: 'Sin canales de recordatorio activos',
+      fechaEnvio: null,
+      leida: false,
+    });
+    if (!reserva.recordatorioEnviado) {
+      reserva.recordatorioEnviado = true;
+      await persistirReserva(reserva);
+    }
     return {
       token,
       resultados: [
         {
           canal: 'general',
           estado: 'omitido',
-          motivo: 'El cliente no tiene correo ni teléfono registrado',
+          motivo: 'El usuario no tiene canales de recordatorio activos o datos de contacto',
         },
       ],
     };
@@ -297,7 +357,9 @@ async function reenviarNotificacion(id) {
 
   let token = reserva.tokenConfirmacion;
   if (!tokenValido(token)) {
-    token = generarTokenAsistencia(reserva);
+    token = generarTokenAsistencia(reserva, {
+      expiresIn: ttlTokenRecordatorio(minutosAnticipacionReserva(reserva)),
+    });
     reserva.tokenConfirmacion = token;
     reserva.tokenExpiraEn = new Date(verificarTokenAsistencia(token).exp * 1000);
     await persistirReserva(reserva);
@@ -542,6 +604,9 @@ function huellaToken(token) {
 module.exports = {
   generarTokenAsistencia,
   verificarTokenAsistencia,
+  obtenerPreferenciasRecordatorio,
+  minutosAnticipacionReserva,
+  ttlTokenRecordatorio,
   fechaHoraInicio,
   enviarRecordatorio,
   reenviarNotificacion,
