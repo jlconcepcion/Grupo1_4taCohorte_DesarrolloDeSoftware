@@ -9,11 +9,21 @@ import {
   reportesApi,
   notificacionesApi,
   preferenciasApi,
+  sugerenciasApi,
   getToken,
   guardarSesion,
 } from '../api.js';
 
 const TELEFONO_REGEX = /^\+?[1-9]\d{1,14}$/;
+
+const CATEGORIAS_SUGERENCIA = [
+  { valor: 'instalaciones', etiqueta: 'Instalaciones' },
+  { valor: 'instructor', etiqueta: 'Instructor' },
+  { valor: 'horarios', etiqueta: 'Horarios' },
+  { valor: 'limpieza', etiqueta: 'Limpieza' },
+  { valor: 'atencion', etiqueta: 'Atención' },
+  { valor: 'otro', etiqueta: 'Otro' },
+];
 
 const DIAS_SEMANA = [
   { valor: 1, etiqueta: 'Lunes' },
@@ -286,6 +296,9 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
   const [misReservas, setMisReservas] = useState([]);
   const [todasReservas, setTodasReservas] = useState([]);
   const [conteosInstructor, setConteosInstructor] = useState([]);
+  const [misSugerencias, setMisSugerencias] = useState([]);
+  const [todasSugerencias, setTodasSugerencias] = useState([]);
+  const [indicadoresSugerencias, setIndicadoresSugerencias] = useState(null);
 
   const [cargando, setCargando] = useState(true);
   const [mensajeExito, setMensajeExito] = useState('');
@@ -374,6 +387,21 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
     nuevaFecha: '',
     nuevoClienteId: '',
   });
+
+  // Estado y filtros de Épica 5 · Sugerencias e Indicadores (ST05.02 - ST05.06)
+  const [formSugerencia, setFormSugerencia] = useState({
+    recinto: '',
+    clase: '',
+    categoria: 'instalaciones',
+    texto: '',
+  });
+  const [filtroSugRecinto, setFiltroSugRecinto] = useState('');
+  const [filtroSugCategoria, setFiltroSugCategoria] = useState('');
+  const [filtroSugEstado, setFiltroSugEstado] = useState('');
+  const [filtroIndDesde, setFiltroIndDesde] = useState('');
+  const [filtroIndHasta, setFiltroIndHasta] = useState('');
+  const [paginaMisSugerencias, setPaginaMisSugerencias] = useState(1);
+  const [paginaTodasSugerencias, setPaginaTodasSugerencias] = useState(1);
 
   // Navegación y paginación
   const [vistaAdmin, setVistaAdmin] = useState('recintos');
@@ -549,7 +577,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
       setBloques(Array.isArray(listaBloques) ? listaBloques : []);
 
       if (esCliente) {
-        const [disp, mias] = await Promise.all([
+        const [disp, mias, sugerenciasMias] = await Promise.all([
           reservasApi
             .disponibilidad({
               fecha: filtroDispFecha,
@@ -565,9 +593,11 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
             reportarErrorCarga('No se pudieron cargar tus reservas', err);
             return [];
           }),
+          sugerenciasApi.mias().catch(() => []),
         ]);
         setDisponibilidad(Array.isArray(disp) ? disp : []);
         setMisReservas(Array.isArray(mias) ? mias : []);
+        setMisSugerencias(Array.isArray(sugerenciasMias) ? sugerenciasMias : []);
       }
 
       if (esInstructor) {
@@ -579,27 +609,49 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
       }
 
       if (esCoordinador || esAdmin) {
-        const reservasSistema = await reservasApi
-          .listarTodas({
-            fecha: filtroResFecha,
-            recinto: filtroResRecinto,
-            clase: filtroResClase,
-            instructor: filtroResInstructor,
-            estado: filtroResEstado,
-          })
-          .catch((err) => {
-            reportarErrorCarga('No se pudieron cargar las reservas del sistema', err);
-            return [];
-          });
+        const [reservasSistema, sugerenciasSistema] = await Promise.all([
+          reservasApi
+            .listarTodas({
+              fecha: filtroResFecha,
+              recinto: filtroResRecinto,
+              clase: filtroResClase,
+              instructor: filtroResInstructor,
+              estado: filtroResEstado,
+            })
+            .catch((err) => {
+              reportarErrorCarga('No se pudieron cargar las reservas del sistema', err);
+              return [];
+            }),
+          sugerenciasApi
+            .listar({
+              recinto: filtroSugRecinto,
+              categoria: filtroSugCategoria,
+              estado: filtroSugEstado,
+              desde: filtroIndDesde,
+              hasta: filtroIndHasta,
+            })
+            .catch(() => []),
+        ]);
         setTodasReservas(Array.isArray(reservasSistema) ? reservasSistema : []);
+        setTodasSugerencias(Array.isArray(sugerenciasSistema) ? sugerenciasSistema : []);
       }
 
       if (esAdmin) {
-        const listaUsuarios = await usuariosApi.listar().catch((err) => {
-          reportarErrorCarga('No se pudo cargar la lista de usuarios', err);
-          return [];
-        });
+        const [listaUsuarios, datosIndicadores] = await Promise.all([
+          usuariosApi.listar().catch((err) => {
+            reportarErrorCarga('No se pudo cargar la lista de usuarios', err);
+            return [];
+          }),
+          sugerenciasApi
+            .indicadores({
+              desde: filtroIndDesde,
+              hasta: filtroIndHasta,
+              recinto: filtroSugRecinto,
+            })
+            .catch(() => null),
+        ]);
         setUsuarios(Array.isArray(listaUsuarios) ? listaUsuarios : []);
+        setIndicadoresSugerencias(datosIndicadores);
       }
     } catch (err) {
       reportarErrorCarga('No se pudo cargar el panel', err);
@@ -623,6 +675,11 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
     filtroResInstructor,
     filtroResEstado,
     filtroConteoFecha,
+    filtroSugRecinto,
+    filtroSugCategoria,
+    filtroSugEstado,
+    filtroIndDesde,
+    filtroIndHasta,
   ]);
 
   useEffect(() => {
@@ -693,6 +750,8 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
   const bloquesProximos = bloques.filter(esBloqueProximo);
   const bloquesInstructorPaginados = paginar(bloquesProximos, paginaBloquesInstructor);
   const conteosInstructorPaginados = paginar(conteosInstructor, paginaConteoInstructor);
+  const misSugerenciasPaginadas = paginar(misSugerencias, paginaMisSugerencias);
+  const todasSugerenciasPaginadas = paginar(todasSugerencias, paginaTodasSugerencias);
 
   // ===========================================================================
   // Acciones Administrador: Recintos (HU04, HU05, ST02.03) y Usuarios (HU03)
@@ -962,6 +1021,49 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
       await cargarDatos();
     } catch (err) {
       setMensajeError(mensajeErrorAccion(err, 'No se pudo reasignar la reserva'));
+    } finally {
+      setAccionEnCurso(false);
+    }
+  }
+
+  // ===========================================================================
+  // Acciones Sprint 4 · Épica 5: Quejas, Sugerencias e Indicadores (ST05.02 - ST05.06)
+  // ===========================================================================
+  async function enviarSugerenciaCliente(e) {
+    e.preventDefault();
+    limpiarAvisos();
+    setAccionEnCurso(true);
+    try {
+      await sugerenciasApi.crear({
+        recinto: formSugerencia.recinto,
+        clase: formSugerencia.clase || null,
+        categoria: formSugerencia.categoria,
+        texto: formSugerencia.texto,
+      });
+      setMensajeExito('¡Gracias! Tu queja o sugerencia fue enviada y registrada correctamente.');
+      setFormSugerencia({
+        recinto: '',
+        clase: '',
+        categoria: 'instalaciones',
+        texto: '',
+      });
+      await cargarDatos();
+    } catch (err) {
+      setMensajeError(mensajeErrorAccion(err, 'No se pudo enviar la sugerencia'));
+    } finally {
+      setAccionEnCurso(false);
+    }
+  }
+
+  async function cambiarEstadoSugerencia(id, nuevoEstado = 'revisada') {
+    limpiarAvisos();
+    setAccionEnCurso(true);
+    try {
+      await sugerenciasApi.cambiarEstado(id, nuevoEstado);
+      setMensajeExito(`Sugerencia marcada como ${nuevoEstado.toUpperCase()}.`);
+      await cargarDatos();
+    } catch (err) {
+      setMensajeError(mensajeErrorAccion(err, 'No se pudo actualizar la sugerencia'));
     } finally {
       setAccionEnCurso(false);
     }
@@ -1306,6 +1408,17 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                   >
                     Mis Reservas ({misReservas.length})
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setVistaCliente('sugerencias')}
+                    className={`rounded-xl px-4 py-2 text-sm font-bold transition ${
+                      vistaCliente === 'sugerencias'
+                        ? 'bg-[#1268e8] text-white shadow-sm'
+                        : 'text-slate-500 hover:bg-slate-50'
+                    }`}
+                  >
+                    Quejas y Sugerencias ({misSugerencias.length})
+                  </button>
                 </div>
 
                 {vistaCliente === 'disponibilidad' && (
@@ -1556,6 +1669,170 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                     />
                   </div>
                 )}
+
+                {vistaCliente === 'sugerencias' && (
+                  <div className="grid gap-6 lg:grid-cols-2">
+                    {/* Formulario de envío de Quejas y Sugerencias (ST05.02) */}
+                    <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
+                      <h2 className="text-xl font-bold">
+                        Buzón de Quejas y Sugerencias (ST05.02)
+                      </h2>
+                      <p className="mt-1 text-xs text-slate-400">
+                        Cuéntanos tu experiencia sobre un recinto o clase (máximo 500 caracteres).
+                      </p>
+
+                      <form onSubmit={enviarSugerenciaCliente} className="mt-4 space-y-3">
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div>
+                            <label className="block text-xs font-bold text-slate-600">
+                              Recinto *
+                            </label>
+                            <select
+                              required
+                              value={formSugerencia.recinto}
+                              onChange={(e) =>
+                                setFormSugerencia({ ...formSugerencia, recinto: e.target.value })
+                              }
+                              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                            >
+                              <option value="">Selecciona recinto...</option>
+                              {recintosActivos.map((r) => (
+                                <option key={r._id} value={r._id}>
+                                  {r.nombre}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold text-slate-600">
+                              Clase (opcional)
+                            </label>
+                            <select
+                              value={formSugerencia.clase}
+                              onChange={(e) =>
+                                setFormSugerencia({ ...formSugerencia, clase: e.target.value })
+                              }
+                              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                            >
+                              <option value="">General del recinto</option>
+                              {clases.map((c) => (
+                                <option key={c._id} value={c._id}>
+                                  {c.nombre}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-600">
+                            Categoría *
+                          </label>
+                          <select
+                            required
+                            value={formSugerencia.categoria}
+                            onChange={(e) =>
+                              setFormSugerencia({ ...formSugerencia, categoria: e.target.value })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                          >
+                            {CATEGORIAS_SUGERENCIA.map((cat) => (
+                              <option key={cat.valor} value={cat.valor}>
+                                {cat.etiqueta}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <div className="flex items-center justify-between">
+                            <label className="block text-xs font-bold text-slate-600">
+                              Detalle de tu queja o sugerencia *
+                            </label>
+                            <span
+                              className={`text-xs font-semibold ${
+                                formSugerencia.texto.length > 500
+                                  ? 'text-red-600'
+                                  : 'text-slate-400'
+                              }`}
+                            >
+                              {formSugerencia.texto.length}/500
+                            </span>
+                          </div>
+                          <textarea
+                            required
+                            rows={4}
+                            maxLength={500}
+                            value={formSugerencia.texto}
+                            onChange={(e) =>
+                              setFormSugerencia({ ...formSugerencia, texto: e.target.value })
+                            }
+                            placeholder="Escribe aquí tu comentario, queja o propuesta de mejora..."
+                            className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                          />
+                        </div>
+
+                        <button
+                          type="submit"
+                          disabled={accionEnCurso || !formSugerencia.texto.trim()}
+                          className="primary-button !py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {accionEnCurso ? 'Enviando...' : 'Enviar sugerencia'}
+                        </button>
+                      </form>
+                    </div>
+
+                    {/* Historial de sugerencias enviadas por el cliente */}
+                    <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
+                      <h2 className="text-xl font-bold">Mis Sugerencias Enviadas</h2>
+                      <p className="mt-1 text-xs text-slate-400">
+                        Seguimiento de estado (Nueva o Revisada por coordinación).
+                      </p>
+
+                      {misSugerencias.length === 0 ? (
+                        <p className="mt-6 text-sm text-slate-400">
+                          Aún no has enviado quejas ni sugerencias.
+                        </p>
+                      ) : (
+                        <>
+                          <div className="mt-4 divide-y divide-slate-100">
+                            {misSugerenciasPaginadas.registros.map((s) => (
+                              <article key={s._id} className="py-3 text-sm">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <span className="font-bold">
+                                    {s.recinto?.nombre || 'Recinto'}
+                                    {s.clase?.nombre ? ` · ${s.clase.nombre}` : ''}
+                                  </span>
+                                  <span
+                                    className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase ${
+                                      s.estado === 'revisada'
+                                        ? 'bg-emerald-50 text-emerald-700'
+                                        : 'bg-amber-50 text-amber-700'
+                                    }`}
+                                  >
+                                    {s.estado}
+                                  </span>
+                                </div>
+                                <p className="mt-1 text-xs font-semibold uppercase text-[#1268e8]">
+                                  Categoría: {s.categoria}
+                                </p>
+                                <p className="mt-1 text-slate-600">{s.texto}</p>
+                              </article>
+                            ))}
+                          </div>
+                          <Paginacion
+                            etiqueta="Mis sugerencias"
+                            pagina={misSugerenciasPaginadas.paginaActual}
+                            totalPaginas={misSugerenciasPaginadas.totalPaginas}
+                            totalRegistros={misSugerencias.length}
+                            onCambiar={setPaginaMisSugerencias}
+                          />
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1597,6 +1874,17 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                     }`}
                   >
                     Reservas ({todasReservas.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setVistaAdmin('sugerencias')}
+                    className={`rounded-xl px-4 py-2 text-sm font-bold transition ${
+                      vistaAdmin === 'sugerencias'
+                        ? 'bg-[#1268e8] text-white shadow-sm'
+                        : 'text-slate-500 hover:bg-slate-50'
+                    }`}
+                  >
+                    Indicadores y Sugerencias ({todasSugerencias.length})
                   </button>
                 </div>
 
@@ -2464,6 +2752,17 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                 >
                   Horarios ({bloques.length})
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setVistaCoordinador('sugerencias')}
+                  className={`rounded-xl px-4 py-2 text-sm font-bold transition ${
+                    vistaCoordinador === 'sugerencias'
+                      ? 'bg-[#1268e8] text-white shadow-sm'
+                      : 'text-slate-500 hover:bg-slate-50'
+                  }`}
+                >
+                  Sugerencias ({todasSugerencias.length})
+                </button>
               </div>
             )}
 
@@ -2767,6 +3066,353 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                   totalRegistros={todasReservas.length}
                   onCambiar={setPaginaTodasReservas}
                 />
+              </div>
+            )}
+
+            {/* ===============================================================
+                ÉPICA 5 · PANEL DE SUGERENCIAS E INDICADORES DE DESEMPEÑO
+                (Coordinador: ST05.04 · Administrador: ST05.05 y ST05.06)
+            =============================================================== */}
+            {((usuario?.rol === 'coordinador' && vistaCoordinador === 'sugerencias') ||
+              (usuario?.rol === 'administrador' && vistaAdmin === 'sugerencias')) && (
+              <div className="space-y-6">
+                {/* Panel de Indicadores exclusivo del Administrador (ST05.05 y ST05.06) */}
+                {usuario?.rol === 'administrador' && indicadoresSugerencias && (
+                  <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                      <div>
+                        <h2 className="text-xl font-bold">
+                          Indicadores de Desempeño basados en Sugerencias (ST05.05 · ST05.06)
+                        </h2>
+                        <p className="mt-1 text-xs text-slate-400">
+                          Conteo de quejas y sugerencias por recinto, clase y categoría en el periodo seleccionado.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <label className="text-xs font-semibold text-slate-500">
+                          Desde:{' '}
+                          <input
+                            type="date"
+                            value={filtroIndDesde}
+                            onChange={(e) => setFiltroIndDesde(e.target.value)}
+                            className="ml-1 rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs"
+                          />
+                        </label>
+                        <label className="text-xs font-semibold text-slate-500">
+                          Hasta:{' '}
+                          <input
+                            type="date"
+                            value={filtroIndHasta}
+                            onChange={(e) => setFiltroIndHasta(e.target.value)}
+                            className="ml-1 rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs"
+                          />
+                        </label>
+                        {(filtroIndDesde || filtroIndHasta) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFiltroIndDesde('');
+                              setFiltroIndHasta('');
+                            }}
+                            className="rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-500 hover:bg-slate-50"
+                          >
+                            Todo el periodo
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Tarjetas KPI de resumen */}
+                    <div className="mt-6 grid gap-4 sm:grid-cols-4">
+                      <div className="rounded-2xl bg-slate-50 p-4">
+                        <span className="text-xs font-bold uppercase text-slate-400">
+                          Total Sugerencias
+                        </span>
+                        <p className="mt-1 text-3xl font-extrabold text-slate-800">
+                          {indicadoresSugerencias.resumen?.total || 0}
+                        </p>
+                      </div>
+                      <div className="rounded-2xl bg-amber-50 p-4 text-amber-800">
+                        <span className="text-xs font-bold uppercase">
+                          Nuevas (Sin revisar)
+                        </span>
+                        <p className="mt-1 text-3xl font-extrabold">
+                          {indicadoresSugerencias.resumen?.nuevas || 0}
+                        </p>
+                      </div>
+                      <div className="rounded-2xl bg-emerald-50 p-4 text-emerald-800">
+                        <span className="text-xs font-bold uppercase">
+                          Revisadas
+                        </span>
+                        <p className="mt-1 text-3xl font-extrabold">
+                          {indicadoresSugerencias.resumen?.revisadas || 0}
+                        </p>
+                      </div>
+                      <div className="rounded-2xl bg-blue-50 p-4 text-[#1268e8]">
+                        <span className="text-xs font-bold uppercase">
+                          Tasa de Atención
+                        </span>
+                        <p className="mt-1 text-3xl font-extrabold">
+                          {indicadoresSugerencias.resumen?.porcentajeRevisadas || 0}%
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Gráficos simples de barras y tablas por Recinto, Clase y Categoría (ST05.06) */}
+                    <div className="mt-6 grid gap-6 lg:grid-cols-3">
+                      <div className="rounded-2xl border border-slate-100 p-4">
+                        <h3 className="text-sm font-bold">Por Recinto</h3>
+                        <div className="mt-3 space-y-2.5">
+                          {(indicadoresSugerencias.porRecinto || []).length === 0 ? (
+                            <p className="text-xs text-slate-400">Sin datos</p>
+                          ) : (
+                            indicadoresSugerencias.porRecinto.map((item) => {
+                              const pct =
+                                indicadoresSugerencias.resumen?.total > 0
+                                  ? Math.round(
+                                      (item.total / indicadoresSugerencias.resumen.total) * 100
+                                    )
+                                  : 0;
+                              return (
+                                <div key={item.recintoId} className="text-xs">
+                                  <div className="flex justify-between font-semibold">
+                                    <span>{item.nombre}</span>
+                                    <span>
+                                      {item.total} ({item.revisadas} rev. / {item.nuevas} nuevas)
+                                    </span>
+                                  </div>
+                                  <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                                    <div
+                                      className="h-full bg-[#1268e8]"
+                                      style={{ width: `${Math.max(8, pct)}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-100 p-4">
+                        <h3 className="text-sm font-bold">Por Clase</h3>
+                        <div className="mt-3 space-y-2.5">
+                          {(indicadoresSugerencias.porClase || []).length === 0 ? (
+                            <p className="text-xs text-slate-400">Sin sugerencias asociadas a clases</p>
+                          ) : (
+                            indicadoresSugerencias.porClase.map((item) => {
+                              const pct =
+                                indicadoresSugerencias.resumen?.total > 0
+                                  ? Math.round(
+                                      (item.total / indicadoresSugerencias.resumen.total) * 100
+                                    )
+                                  : 0;
+                              return (
+                                <div key={item.claseId} className="text-xs">
+                                  <div className="flex justify-between font-semibold">
+                                    <span>{item.nombre}</span>
+                                    <span>
+                                      {item.total} ({item.revisadas} rev. / {item.nuevas} nuevas)
+                                    </span>
+                                  </div>
+                                  <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                                    <div
+                                      className="h-full bg-emerald-500"
+                                      style={{ width: `${Math.max(8, pct)}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-100 p-4">
+                        <h3 className="text-sm font-bold">Por Categoría</h3>
+                        <div className="mt-3 space-y-2.5">
+                          {(indicadoresSugerencias.porCategoria || []).map((item) => {
+                            const pct =
+                              indicadoresSugerencias.resumen?.total > 0
+                                ? Math.round(
+                                    (item.total / indicadoresSugerencias.resumen.total) * 100
+                                  )
+                                : 0;
+                            return (
+                              <div key={item.categoria} className="text-xs">
+                                <div className="flex justify-between font-semibold capitalize">
+                                  <span>{item.categoria}</span>
+                                  <span>
+                                    {item.total} ({item.revisadas} rev. / {item.nuevas} nuevas)
+                                  </span>
+                                </div>
+                                <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                                  <div
+                                    className="h-full bg-amber-500"
+                                    style={{ width: `${item.total > 0 ? Math.max(8, pct) : 0}%` }}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Listado de Quejas y Sugerencias para Coordinador y Administrador (ST05.04) */}
+                <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                      <h2 className="text-xl font-bold">
+                        Buzón de Quejas y Sugerencias de Clientes (ST05.04)
+                      </h2>
+                      <p className="mt-1 text-xs text-slate-400">
+                        Filtra por recinto, categoría o estado y marca cada sugerencia como revisada.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3">
+                      <select
+                        value={filtroSugRecinto}
+                        onChange={(e) => setFiltroSugRecinto(e.target.value)}
+                        className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold"
+                      >
+                        <option value="">Todos los recintos</option>
+                        {recintos.map((r) => (
+                          <option key={r._id} value={r._id}>
+                            {r.nombre}
+                          </option>
+                        ))}
+                      </select>
+
+                      <select
+                        value={filtroSugCategoria}
+                        onChange={(e) => setFiltroSugCategoria(e.target.value)}
+                        className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold"
+                      >
+                        <option value="">Todas las categorías</option>
+                        {CATEGORIAS_SUGERENCIA.map((cat) => (
+                          <option key={cat.valor} value={cat.valor}>
+                            {cat.etiqueta}
+                          </option>
+                        ))}
+                      </select>
+
+                      <select
+                        value={filtroSugEstado}
+                        onChange={(e) => setFiltroSugEstado(e.target.value)}
+                        className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold"
+                      >
+                        <option value="">Todos los estados</option>
+                        <option value="nueva">Nuevas</option>
+                        <option value="revisada">Revisadas</option>
+                      </select>
+
+                      {(filtroSugRecinto || filtroSugCategoria || filtroSugEstado) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFiltroSugRecinto('');
+                            setFiltroSugCategoria('');
+                            setFiltroSugEstado('');
+                          }}
+                          className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-50"
+                        >
+                          Limpiar filtros
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {todasSugerencias.length === 0 ? (
+                    <p className="mt-6 text-sm text-slate-400">
+                      No hay sugerencias registradas para los filtros seleccionados.
+                    </p>
+                  ) : (
+                    <div className="mt-6 overflow-x-auto">
+                      <table className="w-full text-left text-sm">
+                        <thead>
+                          <tr className="border-b border-slate-100 text-xs uppercase text-slate-400">
+                            <th className="pb-3 pr-4">Cliente</th>
+                            <th className="pb-3 pr-4">Recinto / Clase</th>
+                            <th className="pb-3 pr-4">Categoría</th>
+                            <th className="pb-3 pr-4">Mensaje</th>
+                            <th className="pb-3 pr-4">Estado</th>
+                            <th className="pb-3">Acción</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {todasSugerenciasPaginadas.registros.map((s) => (
+                            <tr key={s._id}>
+                              <td className="py-3 pr-4 font-semibold">
+                                {nombreMostradoUsuario(s.usuario, 'Cliente')}
+                              </td>
+                              <td className="py-3 pr-4">
+                                <span className="font-bold">
+                                  {s.recinto?.nombre || 'Recinto'}
+                                </span>
+                                {s.clase?.nombre && (
+                                  <span className="block text-xs text-slate-400">
+                                    {s.clase.nombre}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-3 pr-4 text-xs font-bold uppercase text-[#1268e8]">
+                                {s.categoria}
+                              </td>
+                              <td className="max-w-md py-3 pr-4 text-xs text-slate-600">
+                                {s.texto}
+                              </td>
+                              <td className="py-3 pr-4">
+                                <span
+                                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase ${
+                                    s.estado === 'revisada'
+                                      ? 'bg-emerald-50 text-emerald-700'
+                                      : 'bg-amber-50 text-amber-700'
+                                  }`}
+                                >
+                                  {s.estado}
+                                </span>
+                              </td>
+                              <td className="py-3">
+                                {s.estado === 'nueva' ? (
+                                  <button
+                                    type="button"
+                                    disabled={accionEnCurso}
+                                    onClick={() => cambiarEstadoSugerencia(s._id, 'revisada')}
+                                    className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 hover:bg-emerald-100 disabled:opacity-40"
+                                  >
+                                    Marcar revisada
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    disabled={accionEnCurso}
+                                    onClick={() => cambiarEstadoSugerencia(s._id, 'nueva')}
+                                    className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                                  >
+                                    Reabrir
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  <Paginacion
+                    etiqueta="Sugerencias"
+                    pagina={todasSugerenciasPaginadas.paginaActual}
+                    totalPaginas={todasSugerenciasPaginadas.totalPaginas}
+                    totalRegistros={todasSugerencias.length}
+                    onCambiar={setPaginaTodasSugerencias}
+                  />
+                </div>
               </div>
             )}
 

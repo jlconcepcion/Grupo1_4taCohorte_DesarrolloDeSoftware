@@ -47,7 +47,7 @@ Aplicación web para la gestión integral de reservas de canchas deportivas y cl
 - **Sprint 1 (Completado):** Tareas transversales (`TR.01` – `TR.04`) y **Épica 1 · Autenticación y usuarios (`HU01` – `HU03` / `ST01.01` – `ST01.08`)**.
 - **Sprint 2 (Completado):** **Épica 2 · Gestión de recintos y horarios (`HU04` – `HU09` / `ST02.01` – `ST02.11`)**.
 - **Sprint 3 (Completado):** **Épica 3 · Reservas (`HU10` – `HU17` / `ST03.01` – `ST03.11`)**, con cierre de concurrencia, fechas, índices y reasignación.
-- **Sprint 4 (En curso):** **Épica 4 · Notificaciones multi-canal (`HU04` / `ST04.01`–`ST04.14`)**. La Épica 5 · Sugerencias (`HU05`) queda pendiente.
+- **Sprint 4 (Completado):** **Épica 4 · Notificaciones multi-canal (`HU04` / `ST04.01`–`ST04.16`)** y **Épica 5 · Sugerencias de los clientes e indicadores (`HU05` / `ST05.01`–`ST05.07`)**.
 
 ---
 

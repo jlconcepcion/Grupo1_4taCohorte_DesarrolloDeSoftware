@@ -214,3 +214,20 @@ export const reportesApi = {
     return respuesta.blob();
   },
 };
+
+export const sugerenciasApi = {
+  crear: (datos) =>
+    peticion('/sugerencias', {
+      method: 'POST',
+      body: JSON.stringify(datos),
+    }),
+  mias: () => peticion('/sugerencias/mias'),
+  listar: (filtros = {}) => peticion(`/sugerencias${armarQuery(filtros)}`),
+  cambiarEstado: (id, estado = 'revisada') =>
+    peticion(`/sugerencias/${id}/estado`, {
+      method: 'PATCH',
+      body: JSON.stringify({ estado }),
+    }),
+  indicadores: (filtros = {}) =>
+    peticion(`/sugerencias/indicadores${armarQuery(filtros)}`),
+};
