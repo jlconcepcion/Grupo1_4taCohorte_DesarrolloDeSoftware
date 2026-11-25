@@ -37,7 +37,7 @@ beforeEach(() => {
 
 describe('HU10 · Consultar disponibilidad (ST03.03)', () => {
   it('devuelve solo bloques en recintos activos con cupos libres y excluye bloques llenos o inactivos', async () => {
-    // 2026-11-24 es Martes (diaSemana = 2)
+    // 2099-11-24 es Martes (diaSemana = 2)
     BloqueDisponibilidad.find.mockResolvedValue([
       {
         _id: 'blq-libre',
@@ -78,7 +78,7 @@ describe('HU10 · Consultar disponibilidad (ST03.03)', () => {
     });
 
     const res = await request(app)
-      .get('/api/reservas/disponibilidad?fecha=2026-11-24&recinto=rec-1')
+      .get('/api/reservas/disponibilidad?fecha=2099-11-24&recinto=rec-1')
       .set('Authorization', `Bearer ${tokenPara('cliente', 'cli-1')}`);
 
     expect(res.statusCode).toBe(200);
@@ -110,14 +110,14 @@ describe('HU11 · Reservar un cupo y control de concurrencia (ST03.02, ST03.05)'
       bloque: 'blq-1',
       recinto: 'rec-1',
       clase: 'cls-1',
-      fecha: '2026-11-24',
+      fecha: '2099-11-24',
       estado: 'pendiente',
     });
 
     const res = await request(app)
       .post('/api/reservas')
       .set('Authorization', `Bearer ${tokenPara('cliente', 'cli-1')}`)
-      .send({ bloqueId: 'blq-1', fecha: '2026-11-24' });
+      .send({ bloqueId: 'blq-1', fecha: '2099-11-24' });
 
     expect(res.statusCode).toBe(201);
     expect(res.body.estado).toBe('pendiente');
@@ -137,7 +137,7 @@ describe('HU11 · Reservar un cupo y control de concurrencia (ST03.02, ST03.05)'
     const res = await request(app)
       .post('/api/reservas')
       .set('Authorization', `Bearer ${tokenPara('cliente', 'cli-1')}`)
-      .send({ bloqueId: 'blq-1', fecha: '2026-11-24' });
+      .send({ bloqueId: 'blq-1', fecha: '2099-11-24' });
 
     expect(res.statusCode).toBe(409);
     expect(res.body.mensaje).toMatch(/reserva activa/i);
@@ -167,11 +167,11 @@ describe('HU11 · Reservar un cupo y control de concurrencia (ST03.02, ST03.05)'
       request(app)
         .post('/api/reservas')
         .set('Authorization', `Bearer ${tokenPara('cliente', 'cli-A')}`)
-        .send({ bloqueId: 'blq-ultimo', fecha: '2026-11-24' }),
+        .send({ bloqueId: 'blq-ultimo', fecha: '2099-11-24' }),
       request(app)
         .post('/api/reservas')
         .set('Authorization', `Bearer ${tokenPara('cliente', 'cli-B')}`)
-        .send({ bloqueId: 'blq-ultimo', fecha: '2026-11-24' }),
+        .send({ bloqueId: 'blq-ultimo', fecha: '2099-11-24' }),
     ]);
 
     const codigos = [resA.statusCode, resB.statusCode].sort();
@@ -480,7 +480,7 @@ describe('P0 · Validaciones de fecha y reasignación', () => {
       cliente: 'cli-1',
       bloque: 'blq-legacy',
       recinto: 'rec-1',
-      fecha: '2026-11-24',
+      fecha: '2099-11-24',
       estado: 'pendiente',
       save: jest.fn(),
     });
@@ -501,13 +501,13 @@ describe('P0 · Validaciones de fecha y reasignación', () => {
       .set('Authorization', `Bearer ${tokenPara('administrador', 'adm-1')}`)
       .send({
         nuevoBloqueId: 'blq-legacy',
-        nuevaFecha: '2026-11-24',
+        nuevaFecha: '2099-11-24',
         nuevoClienteId: 'cli-2',
       });
 
     expect(res.statusCode).toBe(200);
     expect(res.body.cliente).toBe('cli-2');
-    expect(res.body.fecha).toBe('2026-11-24');
+    expect(res.body.fecha).toBe('2099-11-24');
   });
 
   it('la confirmación del coordinador es idempotente', async () => {
