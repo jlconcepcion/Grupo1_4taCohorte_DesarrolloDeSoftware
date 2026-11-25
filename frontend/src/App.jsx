@@ -83,7 +83,9 @@ export default function App() {
   }
 
   if (autenticado) {
-    return conAviso(<Dashboard usuario={usuario} onSalir={salir} />);
+    return conAviso(
+      <Dashboard usuario={usuario} onSalir={salir} onActualizarUsuario={setUsuario} />
+    );
   }
 
   if (vista === 'login') {

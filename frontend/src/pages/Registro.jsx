@@ -17,6 +17,7 @@ const PREFERENCIAS_INICIALES = {
 
 export default function Registro({ onLogin, onIrALogin, onVolver }) {
   const [correo, setCorreo] = useState('');
+  const [nombreUsuario, setNombreUsuario] = useState('');
   const [telefono, setTelefono] = useState('');
   const [password, setPassword] = useState('');
   const [confirmacion, setConfirmacion] = useState('');
@@ -30,6 +31,9 @@ export default function Registro({ onLogin, onIrALogin, onVolver }) {
     const nuevosErrores = {};
     if (!correo) nuevosErrores.correo = 'Ingresa tu correo';
     else if (!CORREO_REGEX.test(correo)) nuevosErrores.correo = 'Correo inválido';
+    if (nombreUsuario.trim().length > 40) {
+      nuevosErrores.nombreUsuario = 'Máximo 40 caracteres';
+    }
     if (telefono.trim() && !TELEFONO_REGEX.test(telefono.trim())) {
       nuevosErrores.telefono = 'Usa formato E.164, por ejemplo +573001234567';
     }
@@ -53,7 +57,8 @@ export default function Registro({ onLogin, onIrALogin, onVolver }) {
         correo.trim(),
         password,
         telefono.trim(),
-        preferencias
+        preferencias,
+        nombreUsuario.trim()
       );
       onLogin(datos.token, datos.usuario);
     } catch (error) {
@@ -114,6 +119,28 @@ export default function Registro({ onLogin, onIrALogin, onVolver }) {
                 {errores.correo && (
                   <span className="mt-1 block text-xs font-medium text-red-600">
                     {errores.correo}
+                  </span>
+                )}
+              </label>
+
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold text-slate-700">
+                  Nombre de usuario (opcional)
+                </span>
+                <input
+                  type="text"
+                  value={nombreUsuario}
+                  onChange={(e) => setNombreUsuario(e.target.value)}
+                  placeholder="Cómo quieres que te reconozcan"
+                  autoComplete="nickname"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 outline-none transition focus:border-[#1268e8] focus:bg-white focus:ring-4 focus:ring-blue-100"
+                />
+                <span className="mt-1 block text-xs text-slate-400">
+                  Si lo dejas vacío, te verán con tu correo. No se usa para iniciar sesión.
+                </span>
+                {errores.nombreUsuario && (
+                  <span className="mt-1 block text-xs font-medium text-red-600">
+                    {errores.nombreUsuario}
                   </span>
                 )}
               </label>

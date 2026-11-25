@@ -18,6 +18,7 @@ const MONGODB_SCHEMAS = {
             enum: ['cliente', 'coordinador', 'instructor', 'administrador']
           },
           activo: { bsonType: 'bool' },
+          nombreUsuario: { bsonType: 'string', maxLength: 40 },
           telefono: { bsonType: 'string', pattern: '^(\\+?[1-9][0-9]{1,14})?$' },
           preferenciasRecordatorio: {
             bsonType: 'object',

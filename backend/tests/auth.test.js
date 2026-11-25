@@ -38,6 +38,36 @@ describe('POST /api/auth/registro (ST01.03)', () => {
     expect(res.body.token).toEqual(expect.any(String));
   });
 
+  it('guarda el nombre de usuario opcional sin usarlo para el login', async () => {
+    User.create.mockResolvedValue({
+      _id: 'u2',
+      correo: 'nombre@gym.com',
+      rol: 'cliente',
+      nombreUsuario: 'Sofia',
+    });
+
+    const res = await request(app).post('/api/auth/registro').send({
+      correo: 'nombre@gym.com',
+      password: 'Clave12345',
+      nombreUsuario: '  Sofia  ',
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(User.create).toHaveBeenCalledWith(
+      expect.objectContaining({ nombreUsuario: 'Sofia' })
+    );
+  });
+
+  it('rechaza un nombre de usuario demasiado largo con 400', async () => {
+    const res = await request(app)
+      .post('/api/auth/registro')
+      .send({ correo: 'largo@gym.com', password: 'Clave12345', nombreUsuario: 'x'.repeat(41) });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body.errores).toContain('El nombre de usuario no puede superar los 40 caracteres');
+    expect(User.create).not.toHaveBeenCalled();
+  });
+
   it('rechaza datos inválidos con 400 y un error por campo', async () => {
     const res = await request(app)
       .post('/api/auth/registro')

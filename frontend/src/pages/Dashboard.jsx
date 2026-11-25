@@ -9,7 +9,11 @@ import {
   reportesApi,
   notificacionesApi,
   preferenciasApi,
+  getToken,
+  guardarSesion,
 } from '../api.js';
+
+const TELEFONO_REGEX = /^\+?[1-9]\d{1,14}$/;
 
 const DIAS_SEMANA = [
   { valor: 1, etiqueta: 'Lunes' },
@@ -100,8 +104,38 @@ function ControlesPreferencias({ valor, onChange }) {
   );
 }
 
-/**
- * Calcula la próxima fecha YYYY-MM-DD (a partir de mañana) que cae en el día de la semana indicado (0=Dom..6=Sab).
+function nombreVisible(persona) {
+  return String(persona?.nombreUsuario || '').trim() || persona?.correo || '';
+}
+
+function GrupoClientesConteo({ titulo, clientes }) {
+  const lista = Array.isArray(clientes) ? clientes : [];
+
+  return (
+    <div>
+      <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+        {titulo} ({lista.length})
+      </p>
+      {lista.length === 0 ? (
+        <p className="mt-1 text-xs text-slate-400">Sin clientes en este estado.</p>
+      ) : (
+        <ul className="mt-1 space-y-1">
+          {lista.map((item, indice) => (
+            <li
+              key={item.reservaId || `${item.clienteId || 'cliente'}-${indice}`}
+              className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 px-2 py-1 text-xs"
+            >
+              <span className="font-semibold text-slate-700">{nombreVisible(item)}</span>
+              {item.fecha && <span className="text-slate-400">{item.fecha}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** (a partir de mañana) que cae en el día de la semana indicado (0=Dom..6=Sab).
  */
 function proximaFechaParaDia(diaSemanaObjetivo) {
   const hoy = new Date();
@@ -116,6 +150,30 @@ function proximaFechaParaDia(diaSemanaObjetivo) {
     candidato.setDate(candidato.getDate() + 1);
   }
   return '';
+}
+
+function esBloqueProximo(bloque) {
+  const [horas, minutos] = String(bloque?.horaInicio || '').split(':').map(Number);
+  if (!Number.isFinite(horas) || !Number.isFinite(minutos)) return false;
+  const ahora = new Date();
+  for (let i = 0; i <= 7; i += 1) {
+    const candidato = new Date(
+      ahora.getFullYear(),
+      ahora.getMonth(),
+      ahora.getDate() + i,
+      horas,
+      minutos,
+      0,
+      0
+    );
+    if (
+      candidato.getDay() === Number(bloque?.diaSemana) &&
+      candidato.getTime() > ahora.getTime()
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function construirFechaHoraLocal(fecha, hora = '00:00') {
@@ -213,7 +271,7 @@ const ROLES_META = {
   },
 };
 
-export default function Dashboard({ usuario, onSalir }) {
+export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
   const rolInfo = ROLES_META[usuario?.rol] || {
     nombre: usuario?.rol || 'Usuario',
     icono: 'logo',
@@ -236,6 +294,13 @@ export default function Dashboard({ usuario, onSalir }) {
   const [panelNotificacionesAbierto, setPanelNotificacionesAbierto] = useState(false);
   const [modalPreferencias, setModalPreferencias] = useState(false);
   const [usuarioPreferencias, setUsuarioPreferencias] = useState(null);
+  const [modalMiUsuario, setModalMiUsuario] = useState(false);
+  const [formMiUsuario, setFormMiUsuario] = useState({
+    id: '',
+    correo: '',
+    nombreUsuario: '',
+    telefono: '',
+  });
   const [preferenciasRecordatorio, setPreferenciasRecordatorio] = useState(
     preferenciasRecordatorioIniciales
   );
@@ -252,6 +317,7 @@ export default function Dashboard({ usuario, onSalir }) {
   // Estado para formulario de Usuarios (HU03 - Administrador)
   const [formUsuario, setFormUsuario] = useState({
     correo: '',
+    nombreUsuario: '',
     password: '',
     telefono: '',
     rol: 'cliente',
@@ -276,6 +342,8 @@ export default function Dashboard({ usuario, onSalir }) {
     horaFin: '18:00',
     capacidad: 12,
   });
+  const [formularioBloqueAbierto, setFormularioBloqueAbierto] = useState(false);
+  const [formularioClaseAbierto, setFormularioClaseAbierto] = useState(false);
 
   // Filtros de consulta por recinto y día (Horarios generales)
   const [filtroRecinto, setFiltroRecinto] = useState('');
@@ -296,6 +364,7 @@ export default function Dashboard({ usuario, onSalir }) {
   const [filtroResInstructor, setFiltroResInstructor] = useState('');
   const [filtroResEstado, setFiltroResEstado] = useState('');
   const [filtroConteoFecha, setFiltroConteoFecha] = useState('');
+  const [conteosExpandidos, setConteosExpandidos] = useState({});
   const [motivoCancelacionCoord, setMotivoCancelacionCoord] = useState('');
 
   // Formulario de Reasignación de Reserva exclusiva del Administrador (ST03.10)
@@ -324,6 +393,10 @@ export default function Dashboard({ usuario, onSalir }) {
   function limpiarAvisos() {
     setMensajeExito('');
     setMensajeError('');
+  }
+
+  function alternarTarjetaConteo(id) {
+    setConteosExpandidos((actual) => ({ ...actual, [id]: !actual[id] }));
   }
 
   function reportarErrorCarga(contexto, err) {
@@ -407,6 +480,50 @@ export default function Dashboard({ usuario, onSalir }) {
       );
       setModalPreferencias(false);
       setMensajeExito('Preferencias de recordatorio actualizadas');
+      await cargarDatos();
+    } catch (err) {
+      setMensajeError(err.errores?.join(' · ') || err.message);
+    }
+  }
+
+  function abrirMiUsuario(usuarioDestino = null) {
+    limpiarAvisos();
+    const destino = usuarioDestino || usuario;
+    setFormMiUsuario({
+      id: destino?._id || '',
+      correo: destino?.correo || '',
+      nombreUsuario: destino?.nombreUsuario || '',
+      telefono: destino?.telefono || '',
+    });
+    setModalMiUsuario(true);
+  }
+
+  async function guardarMiUsuario() {
+    limpiarAvisos();
+    const nombreUsuario = String(formMiUsuario.nombreUsuario || '').trim();
+    const telefono = String(formMiUsuario.telefono || '').trim();
+    if (nombreUsuario.length > 40) {
+      setMensajeError('El nombre de usuario no puede superar los 40 caracteres');
+      return;
+    }
+    if (telefono && !TELEFONO_REGEX.test(telefono)) {
+      setMensajeError('El teléfono debe estar en formato E.164');
+      return;
+    }
+    try {
+      const datos = await usuariosApi.actualizarPerfil(formMiUsuario.id, {
+        nombreUsuario,
+        telefono,
+      });
+      const esPropio = String(formMiUsuario.id) === String(usuario?._id);
+      if (esPropio) {
+        guardarSesion(getToken(), datos);
+        onActualizarUsuario(datos);
+      }
+      setModalMiUsuario(false);
+      setMensajeExito(
+        nombreUsuario ? 'Datos de usuario actualizados.' : 'Nombre removido; se mostrará tu correo.'
+      );
       await cargarDatos();
     } catch (err) {
       setMensajeError(err.errores?.join(' · ') || err.message);
@@ -573,7 +690,8 @@ export default function Dashboard({ usuario, onSalir }) {
   const misReservasPaginadas = paginar(misReservas, paginaMisReservas);
   const todasReservasPaginadas = paginar(todasReservas, paginaTodasReservas);
   const clasesInstructorPaginadas = paginar(clases, paginaClasesInstructor);
-  const bloquesInstructorPaginados = paginar(bloques, paginaBloquesInstructor);
+  const bloquesProximos = bloques.filter(esBloqueProximo);
+  const bloquesInstructorPaginados = paginar(bloquesProximos, paginaBloquesInstructor);
   const conteosInstructorPaginados = paginar(conteosInstructor, paginaConteoInstructor);
 
   // ===========================================================================
@@ -631,6 +749,7 @@ export default function Dashboard({ usuario, onSalir }) {
       setMensajeExito(`Cuenta creada para ${formUsuario.correo} con rol ${formUsuario.rol}.`);
       setFormUsuario({
         correo: '',
+        nombreUsuario: '',
         password: '',
         telefono: '',
         rol: 'cliente',
@@ -666,6 +785,7 @@ export default function Dashboard({ usuario, onSalir }) {
         setMensajeExito('Clase creada y vinculada al recinto activo.');
       }
       setFormClase({ id: null, nombre: '', tipoRutina: '', recinto: '' });
+      setFormularioClaseAbierto(false);
       await cargarDatos();
     } catch (err) {
       setMensajeError(err.errores?.join(' · ') || err.message);
@@ -679,6 +799,10 @@ export default function Dashboard({ usuario, onSalir }) {
       setMensajeError(
         `La capacidad no puede superar la del recinto (${recintoSeleccionado.capacidad} clientes).`
       );
+      return;
+    }
+    if (!esBloqueProximo(formBloque)) {
+      setMensajeError('Solo puedes publicar bloques cuya próxima clase aún no haya pasado.');
       return;
     }
     try {
@@ -707,6 +831,7 @@ export default function Dashboard({ usuario, onSalir }) {
         horaFin: '18:00',
         capacidad: 12,
       });
+      setFormularioBloqueAbierto(false);
       await cargarDatos();
     } catch (err) {
       setMensajeError(err.errores?.join(' · ') || err.message);
@@ -715,6 +840,7 @@ export default function Dashboard({ usuario, onSalir }) {
 
   function seleccionarBloqueParaEditar(b) {
     limpiarAvisos();
+    setFormularioBloqueAbierto(true);
     setFormBloque({
       id: b._id,
       clase: b.clase?._id || b.clase || '',
@@ -856,7 +982,14 @@ export default function Dashboard({ usuario, onSalir }) {
         .map((item) => {
           const instructor = item.instructor;
           const id = instructor._id || instructor;
-          return [String(id), { _id: id, correo: instructor.correo || 'Instructor' }];
+          return [
+            String(id),
+            {
+              _id: id,
+              correo: instructor.correo || 'Instructor',
+              nombreUsuario: instructor.nombreUsuario || '',
+            },
+          ];
         })
     ).values(),
   ];
@@ -873,13 +1006,20 @@ export default function Dashboard({ usuario, onSalir }) {
             </span>
             <div>
               <p className="text-lg font-extrabold leading-tight">FitBook</p>
-              <p className="text-xs text-slate-400">{usuario?.correo}</p>
+              <p className="text-xs text-slate-400">{nombreVisible(usuario) || 'Usuario'}</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <span className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-bold text-[#1268e8]">
               {rolInfo.nombre}
             </span>
+            <button
+              type="button"
+              onClick={() => abrirMiUsuario()}
+              className="secondary-button !px-4 !py-2.5"
+            >
+              Mi usuario
+            </button>
             <button
               type="button"
               onClick={() => abrirPreferencias()}
@@ -1000,7 +1140,7 @@ export default function Dashboard({ usuario, onSalir }) {
             <h2 className="text-xl font-bold">Preferencias del recordatorio</h2>
             <p className="mt-1 text-xs text-slate-400">
               {usuarioPreferencias
-                ? `Editando las preferencias de ${usuarioPreferencias.correo}.`
+                  ? `Editando las preferencias de ${nombreVisible(usuarioPreferencias)}.`
                 : 'Estas preferencias aplican a tus reservas.'}
             </p>
             <div className="mt-5">
@@ -1020,6 +1160,84 @@ export default function Dashboard({ usuario, onSalir }) {
               <button
                 type="button"
                 onClick={guardarPreferencias}
+                className="primary-button !px-4 !py-2.5"
+              >
+                Guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modalMiUsuario && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/40 px-4">
+          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <h2 className="text-xl font-bold">Mi usuario</h2>
+            <p className="mt-1 text-xs text-slate-400">
+              {String(formMiUsuario.id) === String(usuario?._id)
+                ? 'Tu nombre de usuario es opcional y no se usa para iniciar sesión.'
+                : `Editando a ${nombreVisible(formMiUsuario)}.`}
+            </p>
+            <div className="mt-5 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-600">Correo</label>
+                <input
+                  type="email"
+                  value={formMiUsuario.correo}
+                  disabled
+                  className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-600">
+                  Nombre de usuario (opcional)
+                </label>
+                <input
+                  type="text"
+                  value={formMiUsuario.nombreUsuario}
+                  onChange={(e) =>
+                    setFormMiUsuario({ ...formMiUsuario, nombreUsuario: e.target.value })
+                  }
+                  placeholder="Cómo quieres que te reconozcan"
+                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                />
+                <span className="mt-1 block text-xs text-slate-400">
+                  Si lo dejas vacío, te verán con tu correo.
+                </span>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-600">
+                  WhatsApp (opcional, formato E.164)
+                </label>
+                <input
+                  type="tel"
+                  value={formMiUsuario.telefono}
+                  onChange={(e) =>
+                    setFormMiUsuario({ ...formMiUsuario, telefono: e.target.value })
+                  }
+                  placeholder="+573001234567"
+                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+            <div className="mt-6 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setFormMiUsuario({ ...formMiUsuario, nombreUsuario: '' })}
+                className="secondary-button !px-4 !py-2.5"
+              >
+                Quitar nombre
+              </button>
+              <button
+                type="button"
+                onClick={() => setModalMiUsuario(false)}
+                className="secondary-button !px-4 !py-2.5"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={guardarMiUsuario}
                 className="primary-button !px-4 !py-2.5"
               >
                 Guardar
@@ -1142,7 +1360,7 @@ export default function Dashboard({ usuario, onSalir }) {
                           <option value="">Todos los instructores</option>
                           {instructoresDisponibles.map((i) => (
                             <option key={i._id || i} value={i._id || i}>
-                              {i.correo || 'Instructor'}
+                              {nombreVisible(i) || 'Instructor'}
                             </option>
                           ))}
                         </select>
@@ -1198,7 +1416,7 @@ export default function Dashboard({ usuario, onSalir }) {
                                   Recinto: <strong>{item.recinto?.nombre || 'Recinto'}</strong>
                                 </p>
                                 <p className="text-xs text-slate-500">
-                                  Instructor: {item.instructor?.correo || 'Instructor asignado'}
+                                  Instructor: {nombreVisible(item.instructor) || 'Instructor asignado'}
                                 </p>
                                 <p className="mt-2 text-xs font-semibold text-slate-600">
                                   Fecha a reservar: <code>{fechaReserva}</code>
@@ -1289,7 +1507,7 @@ export default function Dashboard({ usuario, onSalir }) {
                                 <td className="py-3 pr-4">{r.recinto?.nombre || 'Recinto'}</td>
                                 <td className="py-3 pr-4">{r.clase?.nombre || 'Clase'}</td>
                                 <td className="py-3 pr-4 text-xs text-slate-600">
-                                  {r.bloque?.instructor?.correo || 'Instructor'}
+                                  {nombreVisible(r.bloque?.instructor) || 'Instructor'}
                                 </td>
                                 <td className="py-3 pr-4">
                                   <BadgeEstadoReserva estado={r.estado} />
@@ -1564,6 +1782,20 @@ export default function Dashboard({ usuario, onSalir }) {
                         </div>
                         <div>
                           <label className="block text-xs font-bold text-slate-600">
+                            Nombre de usuario (opcional)
+                          </label>
+                          <input
+                            type="text"
+                            value={formUsuario.nombreUsuario}
+                            onChange={(e) =>
+                              setFormUsuario({ ...formUsuario, nombreUsuario: e.target.value })
+                            }
+                            placeholder="Cómo quieres que te reconozcan"
+                            className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-600">
                             WhatsApp (opcional, formato E.164)
                           </label>
                           <input
@@ -1645,11 +1877,23 @@ export default function Dashboard({ usuario, onSalir }) {
                             key={u._id}
                             className="flex items-center justify-between py-2.5 text-sm"
                           >
-                            <span className="font-medium">{u.correo}</span>
+                            <span>
+                              <span className="block font-medium">{nombreVisible(u)}</span>
+                              {u.nombreUsuario && (
+                                <span className="block text-xs text-slate-400">{u.correo}</span>
+                              )}
+                            </span>
                             <div className="flex items-center gap-2">
                               <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-[#1268e8]">
                                 {u.rol}
                               </span>
+                              <button
+                                type="button"
+                                onClick={() => abrirMiUsuario(u)}
+                                className="text-xs font-bold text-[#1268e8] underline"
+                              >
+                                Editar
+                              </button>
                               <button
                                 type="button"
                                 onClick={() => abrirPreferencias(u)}
@@ -1683,7 +1927,7 @@ export default function Dashboard({ usuario, onSalir }) {
                 <div className="flex flex-wrap items-center gap-2 rounded-[22px] border border-slate-200 bg-white p-2 shadow-sm">
                   {[
                     { clave: 'clases', etiqueta: `Mis clases (${clases.length})` },
-                    { clave: 'bloques', etiqueta: `Mis bloques (${bloques.length})` },
+                    { clave: 'bloques', etiqueta: `Mis bloques (${bloquesProximos.length})` },
                     { clave: 'conteo', etiqueta: `Conteo (${conteosInstructor.length})` },
                   ].map((tab) => (
                     <button
@@ -1702,7 +1946,27 @@ export default function Dashboard({ usuario, onSalir }) {
                 </div>
 
                 {vistaInstructor === 'clases' && (
-                  <div className="grid gap-6 lg:grid-cols-2">
+                  <div className="space-y-6">
+                    <div className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
+                      <button
+                        type="button"
+                        onClick={() => setFormularioClaseAbierto((abierto) => !abierto)}
+                        aria-expanded={formularioClaseAbierto}
+                        className="flex w-full flex-wrap items-center justify-between gap-3 text-left"
+                      >
+                        <span>
+                          <span className="block text-lg font-bold">Publicar clases</span>
+                          <span className="mt-1 block text-xs text-slate-400">
+                            Despliega esta sección para registrar o actualizar una clase.
+                          </span>
+                        </span>
+                        <span className="rounded-xl bg-[#1268e8] px-3 py-2 text-xs font-bold text-white">
+                          {formularioClaseAbierto ? 'Ocultar formulario' : 'Publicar clases'}
+                        </span>
+                      </button>
+                    </div>
+
+                    {formularioClaseAbierto && (
                     <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
                       <h2 className="text-xl font-bold">
                         {formClase.id ? 'Editar Mi Clase (HU06)' : 'Crear Nueva Clase (HU06)'}
@@ -1760,11 +2024,26 @@ export default function Dashboard({ usuario, onSalir }) {
                             ))}
                           </select>
                         </div>
-                        <button type="submit" className="primary-button !py-2.5 text-sm">
-                          {formClase.id ? 'Actualizar clase' : 'Crear clase'}
-                        </button>
+                        <div className="flex flex-wrap gap-3">
+                          <button type="submit" className="primary-button !py-2.5 text-sm">
+                            {formClase.id ? 'Actualizar clase' : 'Crear clase'}
+                          </button>
+                          {formClase.id && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFormClase({ id: null, nombre: '', tipoRutina: '', recinto: '' });
+                                setFormularioClaseAbierto(false);
+                              }}
+                              className="secondary-button !py-2.5 text-sm"
+                            >
+                              Cancelar
+                            </button>
+                          )}
+                        </div>
                       </form>
                     </div>
+                    )}
 
                     <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
                       <h2 className="text-xl font-bold">Mis Clases (HU06)</h2>
@@ -1790,14 +2069,15 @@ export default function Dashboard({ usuario, onSalir }) {
                                 </p>
                                 <button
                                   type="button"
-                                  onClick={() =>
+                                  onClick={() => {
+                                    setFormularioClaseAbierto(true);
                                     setFormClase({
                                       id: c._id,
                                       nombre: c.nombre,
                                       tipoRutina: c.tipoRutina,
                                       recinto: c.recinto?._id || c.recinto || '',
-                                    })
-                                  }
+                                    });
+                                  }}
                                   className="mt-3 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold hover:bg-slate-50"
                                 >
                                   Editar
@@ -1819,7 +2099,29 @@ export default function Dashboard({ usuario, onSalir }) {
                 )}
 
                 {vistaInstructor === 'bloques' && (
-                  <div className="grid gap-6 lg:grid-cols-2">
+                  <div className="space-y-6">
+                    <div className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
+                      <button
+                        type="button"
+                        onClick={() => setFormularioBloqueAbierto((abierto) => !abierto)}
+                        aria-expanded={formularioBloqueAbierto}
+                        className="flex w-full flex-wrap items-center justify-between gap-3 text-left"
+                      >
+                        <span>
+                          <span className="block text-lg font-bold">
+                            Publicar bloques de disponibilidad
+                          </span>
+                          <span className="mt-1 block text-xs text-slate-400">
+                            Despliega esta sección para registrar o actualizar un bloque.
+                          </span>
+                        </span>
+                        <span className="rounded-xl bg-[#1268e8] px-3 py-2 text-xs font-bold text-white">
+                          {formularioBloqueAbierto ? 'Ocultar formulario' : 'Publicar bloques'}
+                        </span>
+                      </button>
+                    </div>
+
+                    {formularioBloqueAbierto && (
                     <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
                       <h2 className="text-xl font-bold">
                         {formBloque.id
@@ -1950,7 +2252,7 @@ export default function Dashboard({ usuario, onSalir }) {
                           {formBloque.id && (
                             <button
                               type="button"
-                              onClick={() =>
+                              onClick={() => {
                                 setFormBloque({
                                   id: null,
                                   clase: '',
@@ -1959,8 +2261,9 @@ export default function Dashboard({ usuario, onSalir }) {
                                   horaInicio: '16:00',
                                   horaFin: '18:00',
                                   capacidad: 12,
-                                })
-                              }
+                                });
+                                setFormularioBloqueAbierto(false);
+                              }}
                               className="secondary-button !py-2.5 text-sm"
                             >
                               Cancelar
@@ -1969,14 +2272,17 @@ export default function Dashboard({ usuario, onSalir }) {
                         </div>
                       </form>
                     </div>
+                    )}
 
                     <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
                       <h2 className="text-xl font-bold">Mis Bloques (HU07 / HU08)</h2>
                       <p className="mt-1 text-xs text-slate-400">
-                        Tu disponibilidad publicada, de 5 en 5.
+                        Solo se muestran bloques con una próxima sesión pendiente.
                       </p>
-                      {bloques.length === 0 ? (
-                        <p className="mt-4 text-sm text-slate-400">Aún no publicas bloques.</p>
+                      {bloquesProximos.length === 0 ? (
+                        <p className="mt-4 text-sm text-slate-400">
+                          Aún no tienes bloques próximos publicados.
+                        </p>
                       ) : (
                         <>
                           <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -2011,7 +2317,7 @@ export default function Dashboard({ usuario, onSalir }) {
                             etiqueta="Mis bloques"
                             pagina={bloquesInstructorPaginados.paginaActual}
                             totalPaginas={bloquesInstructorPaginados.totalPaginas}
-                            totalRegistros={bloques.length}
+                            totalRegistros={bloquesProximos.length}
                             onCambiar={setPaginaBloquesInstructor}
                           />
                         </>
@@ -2026,7 +2332,7 @@ export default function Dashboard({ usuario, onSalir }) {
                       Conteo de Reservas y Confirmaciones por Clase y Horario (ST03.09)
                     </h2>
                     <p className="mt-1 text-xs text-slate-400">
-                      Resumen actualizado de cupos reservados, confirmados y pendientes en cada uno de tus bloques.
+                      Toca una tarjeta para ver los clientes por estado. Puedes filtrar por fechas pasadas para revisar clases ya realizadas.
                     </p>
 
                     <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -2060,35 +2366,63 @@ export default function Dashboard({ usuario, onSalir }) {
                               key={c.bloqueId}
                               className="rounded-2xl border border-slate-200 p-4"
                             >
-                              <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-[#1268e8]">
-                                {nombreDia(c.diaSemana)} · {c.horaInicio} – {c.horaFin}
-                              </span>
-                              <h3 className="mt-2 font-bold">
-                                {c.clase?.nombre || 'Clase'}
-                              </h3>
-                              <p className="text-xs text-slate-500">
-                                Recinto: {c.recinto?.nombre || 'Recinto'}
-                              </p>
-                              <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
-                                <div className="rounded-xl bg-slate-50 p-2">
-                                  <span className="block text-base font-extrabold text-slate-800">
-                                    {c.totalReservadas}
+                              <button
+                                type="button"
+                                onClick={() => alternarTarjetaConteo(c.bloqueId)}
+                                aria-expanded={Boolean(conteosExpandidos[c.bloqueId])}
+                                className="w-full text-left"
+                              >
+                                <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-[#1268e8]">
+                                  {nombreDia(c.diaSemana)} · {c.horaInicio} – {c.horaFin}
+                                </span>
+                                <span className="mt-2 block font-bold">
+                                  {c.clase?.nombre || 'Clase'}
+                                </span>
+                                <span className="block text-xs text-slate-500">
+                                  Recinto: {c.recinto?.nombre || 'Recinto'}
+                                </span>
+                                <span className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
+                                  <span className="rounded-xl bg-slate-50 p-2">
+                                    <span className="block text-base font-extrabold text-slate-800">
+                                      {c.totalReservadas}
+                                    </span>
+                                    Reservadas
                                   </span>
-                                  Reservadas
-                                </div>
-                                <div className="rounded-xl bg-emerald-50 p-2 text-emerald-700">
-                                  <span className="block text-base font-extrabold">
-                                    {c.confirmadas}
+                                  <span className="rounded-xl bg-emerald-50 p-2 text-emerald-700">
+                                    <span className="block text-base font-extrabold">
+                                      {c.confirmadas}
+                                    </span>
+                                    Confirmadas
                                   </span>
-                                  Confirmadas
-                                </div>
-                                <div className="rounded-xl bg-amber-50 p-2 text-amber-700">
-                                  <span className="block text-base font-extrabold">
-                                    {c.pendientes}
+                                  <span className="rounded-xl bg-amber-50 p-2 text-amber-700">
+                                    <span className="block text-base font-extrabold">
+                                      {c.pendientes}
+                                    </span>
+                                    Pendientes
                                   </span>
-                                  Pendientes
+                                </span>
+                                <span className="mt-3 block text-xs font-bold text-[#1268e8]">
+                                  {conteosExpandidos[c.bloqueId]
+                                    ? 'Ocultar clientes'
+                                    : 'Ver clientes'}
+                                </span>
+                              </button>
+                              {conteosExpandidos[c.bloqueId] && (
+                                <div className="mt-3 space-y-3 border-t border-slate-100 pt-3">
+                                  <GrupoClientesConteo
+                                    titulo="Reservaron"
+                                    clientes={c.clientes?.reservadas}
+                                  />
+                                  <GrupoClientesConteo
+                                    titulo="Confirmaron"
+                                    clientes={c.clientes?.confirmadas}
+                                  />
+                                  <GrupoClientesConteo
+                                    titulo="Pendientes"
+                                    clientes={c.clientes?.pendientes}
+                                  />
                                 </div>
-                              </div>
+                              )}
                             </article>
                           ))}
                         </div>
@@ -2197,7 +2531,7 @@ export default function Dashboard({ usuario, onSalir }) {
                       <option value="">Todos los instructores</option>
                       {instructoresDisponibles.map((i) => (
                         <option key={i._id} value={i._id}>
-                          {i.correo}
+                          {nombreVisible(i)}
                         </option>
                       ))}
                     </select>
@@ -2294,7 +2628,7 @@ export default function Dashboard({ usuario, onSalir }) {
                       <option value="">Mismo cliente</option>
                       {clientesParaReasignar.map((u) => (
                         <option key={u._id} value={u._id}>
-                          {u.correo}
+                          {nombreVisible(u)}
                         </option>
                       ))}
                     </select>
@@ -2343,7 +2677,7 @@ export default function Dashboard({ usuario, onSalir }) {
                         {todasReservasPaginadas.registros.map((r) => (
                           <tr key={r._id}>
                             <td className="py-3 pr-4 font-semibold">
-                              {r.cliente?.correo || 'Cliente'}
+                              {nombreVisible(r.cliente) || 'Cliente'}
                             </td>
                             <td className="py-3 pr-4 font-bold">
                               {r.fecha} · {r.bloque?.horaInicio || '--:--'} –{' '}
@@ -2361,8 +2695,8 @@ export default function Dashboard({ usuario, onSalir }) {
                               <BadgeEstadoReserva estado={r.estado} />
                             </td>
                             <td className="py-3 pr-4 text-xs text-slate-500">
-                              {r.gestionadoPor?.correo
-                                ? `Por ${r.gestionadoPor.correo}`
+                              {nombreVisible(r.gestionadoPor)
+                                ? `Por ${nombreVisible(r.gestionadoPor)}`
                                 : 'Sin cambios'}
                               {r.motivoCancelacion && (
                                 <span className="block text-red-500">
@@ -2591,7 +2925,7 @@ export default function Dashboard({ usuario, onSalir }) {
                             {b.recinto?.nombre || 'Recinto'}
                           </td>
                           <td className="py-3 pr-4 text-xs text-slate-600">
-                            {b.instructor?.correo || 'Instructor'}
+                            {nombreVisible(b.instructor) || 'Instructor'}
                           </td>
                           <td className="py-3 pr-4">
                             <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-[#1268e8]">
@@ -2599,8 +2933,8 @@ export default function Dashboard({ usuario, onSalir }) {
                             </span>
                           </td>
                           <td className="py-3 pr-4 text-xs text-slate-400">
-                            {b.modificadoPor?.correo
-                              ? `Por ${b.modificadoPor.correo}`
+                            {nombreVisible(b.modificadoPor)
+                              ? `Por ${nombreVisible(b.modificadoPor)}`
                               : 'Registro original'}
                           </td>
                           {usuario?.rol !== 'cliente' && (

@@ -553,3 +553,69 @@ describe('P0 · RBAC sobre rutas reales de reservas', () => {
     expect(res.statusCode).toBe(403);
   });
 });
+
+describe('ST03.09 · Conteo del instructor con detalle de clientes', () => {
+  it('acepta fechas pasadas y devuelve los clientes agrupados por estado', async () => {
+    const fechaPasada = '2020-01-15';
+    BloqueDisponibilidad.find.mockResolvedValue([
+      {
+        _id: 'blq-conteo',
+        diaSemana: 3,
+        horaInicio: '10:00',
+        horaFin: '12:00',
+        capacidad: 8,
+        clase: { _id: 'cls-conteo', nombre: 'Funcional' },
+        recinto: { _id: 'rec-conteo', nombre: 'Cancha 1' },
+        instructor: { _id: 'inst-conteo', correo: 'instructor@gym.com' },
+      },
+    ]);
+    Reserva.find.mockResolvedValue([
+      {
+        _id: 'res-confirmada-conteo',
+        fecha: fechaPasada,
+        estado: 'confirmada',
+        cliente: { _id: 'cli-conf', correo: 'confirmada@gym.com', nombreUsuario: 'Ana' },
+      },
+      {
+        _id: 'res-pendiente-conteo',
+        fecha: fechaPasada,
+        estado: 'pendiente',
+        cliente: { _id: 'cli-pend', correo: 'pendiente@gym.com', nombreUsuario: '' },
+      },
+      {
+        _id: 'res-cancelada-conteo',
+        fecha: fechaPasada,
+        estado: 'cancelada',
+        cliente: { _id: 'cli-can', correo: 'cancelada@gym.com' },
+      },
+    ]);
+
+    const res = await request(app)
+      .get(`/api/reservas/conteo-instructor?fecha=${fechaPasada}`)
+      .set('Authorization', `Bearer ${tokenPara('instructor', 'inst-conteo')}`);
+
+    expect(res.statusCode).toBe(200);
+    expect(BloqueDisponibilidad.find).toHaveBeenCalledWith({ instructor: 'inst-conteo' });
+    expect(Reserva.find).toHaveBeenCalledWith({ bloque: 'blq-conteo', fecha: fechaPasada });
+    expect(res.body[0].totalReservadas).toBe(2);
+    expect(res.body[0].confirmadas).toBe(1);
+    expect(res.body[0].pendientes).toBe(1);
+    expect(res.body[0].clientes.reservadas.map((item) => item.correo)).toEqual([
+      'pendiente@gym.com',
+      'confirmada@gym.com',
+    ]);
+    expect(res.body[0].clientes.confirmadas[0].correo).toBe('confirmada@gym.com');
+    expect(res.body[0].clientes.confirmadas[0].nombreUsuario).toBe('Ana');
+    expect(res.body[0].clientes.pendientes[0].correo).toBe('pendiente@gym.com');
+    expect(res.body[0].clientes.pendientes[0].nombreUsuario).toBe('');
+    expect(res.body[0].clientes.canceladas[0].correo).toBe('cancelada@gym.com');
+  });
+
+  it('rechaza fechas con formato inválido en el conteo', async () => {
+    const res = await request(app)
+      .get('/api/reservas/conteo-instructor?fecha=15-01-2020')
+      .set('Authorization', `Bearer ${tokenPara('instructor', 'inst-conteo')}`);
+
+    expect(res.statusCode).toBe(400);
+  });
+});

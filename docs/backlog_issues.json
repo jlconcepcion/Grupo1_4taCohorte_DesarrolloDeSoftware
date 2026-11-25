@@ -252,8 +252,8 @@
     "historia": "HU14",
     "sprint": "Sprint 3",
     "area": "Frontend",
-    "subtarea": "Vista del instructor con el conteo de reservas y de confirmadas por clase y horario.",
-    "criterio": "Los conteos se actualizan después de reservar, cancelar o confirmar."
+    "subtarea": "Vista del instructor con el conteo de reservas y de confirmadas por clase y horario, tarjetas expandibles con el detalle de clientes y bloques próximos.",
+    "criterio": "Los conteos se actualizan después de reservar, cancelar o confirmar; al tocar una tarjeta se ven los clientes que reservaron, confirmaron y están pendientes; se pueden consultar fechas pasadas en el conteo y solo se listan bloques con próxima sesión."
   },
   {
     "id": "ST03.10",
@@ -446,5 +446,13 @@
     "area": "Pruebas",
     "subtarea": "Pruebas: envío válido, envío vacío rechazado y conteo de indicadores correcto.",
     "criterio": "Los tres casos pasan en la suite automatizada."
+  },
+  {
+    "id": "ST04.16",
+    "historia": "HU01/HU03",
+    "sprint": "Sprint 4",
+    "area": "Fullstack",
+    "subtarea": "Nombre de usuario opcional editable por el propio usuario o por el administrador, con visualización por nombre y fallback a correo.",
+    "criterio": "El login sigue siendo por correo; al dejar el nombre vacío se muestra el correo; el dueño y el administrador pueden crear, modificar y eliminar el nombre y el teléfono."
   }
 ]

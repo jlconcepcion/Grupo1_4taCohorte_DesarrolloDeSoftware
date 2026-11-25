@@ -12,6 +12,15 @@ const userSchema = new mongoose.Schema(
     password: { type: String, required: true },
     rol: { type: String, enum: ROLES, default: 'cliente' },
     activo: { type: Boolean, default: true },
+    nombreUsuario: {
+      type: String,
+      trim: true,
+      default: '',
+      validate: {
+        validator: (valor) => !valor || valor.length <= 40,
+        message: 'El nombre de usuario no puede superar los 40 caracteres',
+      },
+    },
     telefono: {
       type: String,
       trim: true,

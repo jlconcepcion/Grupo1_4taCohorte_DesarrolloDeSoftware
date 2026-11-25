@@ -54,6 +54,7 @@
   {
     "correo": "carla@correo.com",
     "password": "MiPassword123",
+    "nombreUsuario": "Carla",
     "telefono": "+573000000001",
     "preferenciasRecordatorio": {
       "activo": true,
@@ -62,7 +63,7 @@
     }
   }
   ```
-- `telefono` y `preferenciasRecordatorio` son opcionales; por defecto se activan los tres canales y se usa la ventana global de 60 minutos.
+- `nombreUsuario`, `telefono` y `preferenciasRecordatorio` son opcionales; por defecto se activan los tres canales y se usa la ventana global de 60 minutos. `nombreUsuario` no se usa para iniciar sesión.
 - **Respuestas:** `201 Created` (`{ usuario, token }`), `400 Bad Request`, `409 Conflict` (correo duplicado).
 
 ### `POST /api/auth/login` (`HU02`)
@@ -78,7 +79,7 @@
 
 ### `GET /api/auth/perfil` (`HU02`)
 - **Acceso:** Cualquier usuario autenticado
-- **Respuestas:** `200 OK` (`{ _id, correo, rol, activo }`), `401 Unauthorized`.
+- **Respuestas:** `200 OK` (`{ _id, correo, nombreUsuario, telefono, rol, activo }`), `401 Unauthorized`.
 
 ### `GET /api/usuarios` y `POST /api/usuarios` (`HU03`)
 - **Acceso:** Exclusivo `administrador` (`403 Forbidden` para otros roles)
@@ -87,6 +88,7 @@
   {
     "correo": "pedro@gym.com",
     "password": "Instructor123",
+    "nombreUsuario": "Pedro",
     "telefono": "+573000000002",
     "rol": "instructor",
     "preferenciasRecordatorio": {
@@ -97,6 +99,12 @@
   }
   ```
 - **Respuestas:** `201 Created`, `400 Bad Request`, `403 Forbidden`, `409 Conflict`.
+
+### `PATCH /api/usuarios/:id` (`ST04.16`)
+- **Acceso:** cualquier usuario autenticado sobre su propio `id`, o `administrador` sobre cualquier usuario.
+- **Body JSON:** `{ "nombreUsuario": "Pedro", "telefono": "+573000000002" }`. Ambos campos son opcionales; enviar `nombreUsuario: ""` lo elimina y hace que se muestre el correo.
+- **Restricciones:** máximo 40 caracteres para `nombreUsuario`, teléfono en formato E.164, no se pueden cambiar correo, contraseña ni rol.
+- **Respuestas:** `200 OK` (usuario actualizado), `400 Bad Request`, `403 Forbidden`, `404 Not Found`.
 
 ### `GET /api/mi-perfil/preferencias-recordatorio` y `PUT /api/mi-perfil/preferencias-recordatorio` (`ST04.15`)
 - **Acceso:** cualquier usuario autenticado; solo puede consultar y editar sus propias preferencias.
@@ -241,8 +249,8 @@
 
 ### `GET /api/reservas/conteo-instructor` (`ST03.09`)
 - **Acceso:** `instructor`, `coordinador` y `administrador`
-- **Query param opcional:** `?fecha=YYYY-MM-DD` (futura o de hoy).
-- **Respuesta:** Lista de bloques con `totalReservadas`, `confirmadas`, `pendientes`, `canceladas`, `cuposLibres` y `fechaFiltro`.
+- **Query param opcional:** `?fecha=YYYY-MM-DD` (cualquier fecha calendario válida, incluidas fechas pasadas para revisar clases ya realizadas).
+- **Respuesta:** Lista de bloques con `totalReservadas`, `confirmadas`, `pendientes`, `canceladas`, `cuposLibres`, `fechaFiltro` y `clientes` con las listas `reservadas`, `confirmadas`, `pendientes` y `canceladas` (`reservaId`, `clienteId`, `correo`, `nombreUsuario`, `fecha`, `estado`, `fechaConfirmacion`).
 
 ---
 

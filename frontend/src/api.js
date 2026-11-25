@@ -58,10 +58,10 @@ export const auth = {
       method: 'POST',
       body: JSON.stringify({ correo, password }),
     }),
-  registro: (correo, password, telefono = '', preferenciasRecordatorio) =>
+  registro: (correo, password, telefono = '', preferenciasRecordatorio, nombreUsuario = '') =>
     peticion('/auth/registro', {
       method: 'POST',
-      body: JSON.stringify({ correo, password, telefono, preferenciasRecordatorio }),
+      body: JSON.stringify({ correo, password, telefono, preferenciasRecordatorio, nombreUsuario }),
     }),
   perfil: () => peticion('/auth/perfil'),
 };
@@ -71,6 +71,11 @@ export const usuariosApi = {
   crear: (datos) =>
     peticion('/usuarios', {
       method: 'POST',
+      body: JSON.stringify(datos),
+    }),
+  actualizarPerfil: (id, datos) =>
+    peticion(`/usuarios/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
       body: JSON.stringify(datos),
     }),
 };

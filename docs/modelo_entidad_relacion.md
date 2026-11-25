@@ -63,6 +63,7 @@ erDiagram
         string password "Hash bcryptjs (pre-save hook, oculto en toJSON) (HU01)"
         string rol "enum: cliente | coordinador | instructor | administrador (HU01-HU03)"
         boolean activo "default: true (HU01, HU02)"
+        string nombreUsuario "opcional, max 40, fallback a correo al mostrar (ST04.16)"
         string telefono "E.164 opcional para WhatsApp (ST04.09)"
         object preferenciasRecordatorio "activo, canales[], minutosAnticipacion (ST04.15)"
         Date createdAt "timestamps: true"
@@ -190,7 +191,8 @@ erDiagram
 
 ## 5. Ampliación de Datos del Sprint 4 · Notificaciones Multi-canal (`HU04`)
 
-- **`User.telefono`** (`string`, E.164, opcional): número usado por el adaptador de WhatsApp; se captura en registro público y alta administrativa.
+- **`User.nombreUsuario`** (`string`, opcional, máximo 40): etiqueta visible elegida por el usuario o por un administrador; si está vacío se muestra el correo. No interviene en el login.
+- **`User.telefono`** (`string`, E.164, opcional): número usado por el adaptador de WhatsApp; se captura en registro público, alta administrativa y se edita desde “Mi usuario”.
 - **`User.preferenciasRecordatorio`** (`object`, `ST04.15`): `activo` (`bool`, default `true`), `canales` (`['email','whatsapp','navegacion']`, al menos uno) y `minutosAnticipacion` (`number|null`, `5–1440`; `null` usa la ventana global). Se edita desde `/api/mi-perfil/preferencias-recordatorio` o, como administrador, desde `/api/usuarios/:id/preferencias-recordatorio`.
 - **`Reserva`:** incorpora `recordatorioEnviado` (`bool`), `tokenConfirmacion` (`string`, JWT con `purpose: 'asistencia'`), `tokenExpiraEn` (`date`) y `tokenUsadoEn` (`date`) para enlaces de un solo uso.
 - **`Notificacion`** (`notificaciones`): auditorsía de cada intento con `reserva`, `destinatario`, `tipo` (`recordatorio` | `resumen_instructor` | `sistema`), `canal` (`email` | `whatsapp` | `navegacion`), `destino`, `asunto`, `mensaje`, `estado` (`enviado` | `fallido` | `omitido`), `proveedorId`, `error`, `fechaEnvio` y `leida`. El canal `navegacion` es persistente, no requiere SMTP/Twilio y se muestra en una bandeja desplegable dentro del encabezado del Dashboard, con contador de no leídas, historial por usuario y acciones para marcar una o todas como leídas.

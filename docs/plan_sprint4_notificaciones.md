@@ -66,7 +66,7 @@ Las preferencias de recordatorio (`ST04.15`) se guardan por usuario con `activo`
 
 ## Verificación
 
-- `cd backend && npm test -- --runInBand` → **10 suites / 85 pruebas** en verde.
+- `cd backend && npm test -- --runInBand` → **10 suites / 96 pruebas** en verde.
 - `cd frontend && npm run build` verificado correctamente.
 - Prueba local: `docker compose up -d --build`; al crear un usuario con correo y teléfono se envía bienvenida por email a la bandeja de Mailpit `http://localhost:8025` y por WhatsApp simulado con `TWILIO_MODO_SIMULACION=true`, ambas auditadas en `notificaciones`.
 - `docker compose up -d --build` verificado: `health=200`, `frontend=200`, `mailpit=200`.
