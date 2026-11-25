@@ -36,7 +36,7 @@ Se conserva la numeración original del backlog aunque `HU04` ya existiera como 
 | `ST04.11` | Plantilla unificada de correo y WhatsApp. |
 | `ST04.12` | Auditoría `Notificacion` y consulta/reenvío desde coordinación. |
 | `ST04.13` | Pruebas de fallo parcial, idempotencia, token, auditoría y resumen. |
-| `ST04.14` | Canal de navegación: aviso persistido al crear usuario, visible en el Dashboard y marcable como leído. |
+| `ST04.14` | Canal de navegación: aviso persistido al crear usuario, visible en la bandeja desplegable del Dashboard y marcable como leído. |
 
 ## Variables de entorno nuevas
 
@@ -62,12 +62,15 @@ TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
 
 Las credenciales reales no se versionan; `backend/.env` está ignorado.
 
+Las preferencias de recordatorio (`ST04.15`) se guardan por usuario con `activo`, `canales` (`email`, `whatsapp`, `navegacion`) y `minutosAnticipacion`. Los defaults son todos los canales activos y `null` para usar `NOTIFICACIONES_VENTANA_MIN=60`. El job usa la anticipación individual y el enlace de confirmación recibe un TTL extendido proporcional (`minutos + 120`).
+
 ## Verificación
 
-- `cd backend && npm test -- --runInBand` → **9 suites / 80 pruebas** en verde.
+- `cd backend && npm test -- --runInBand` → **10 suites / 96 pruebas** en verde.
 - `cd frontend && npm run build` verificado correctamente.
 - Prueba local: `docker compose up -d --build`; al crear un usuario con correo y teléfono se envía bienvenida por email a la bandeja de Mailpit `http://localhost:8025` y por WhatsApp simulado con `TWILIO_MODO_SIMULACION=true`, ambas auditadas en `notificaciones`.
 - `docker compose up -d --build` verificado: `health=200`, `frontend=200`, `mailpit=200`.
 - Smoke real: alta de usuario `201`, 1 mensaje en Mailpit y auditoría `email`, `whatsapp` y `navegacion` en estado `enviado`.
 - Smoke de cancelación: `PATCH /api/reservas/:id/cancelar` → `200`; el cliente recibe `Reserva cancelada` con responsable y motivo, y quien cancela recibe `Cancelación registrada`.
+- Preferencias: `GET/PUT /api/mi-perfil/preferencias-recordatorio` y `GET/PUT /api/usuarios/:id/preferencias-recordatorio` verificados en la suite `tests/sprint4_preferencias.test.js`; el registro y el alta administrativa capturan preferencias y el Dashboard permite editarlas.
 - Twilio en modo trial requiere números verificados; en producción se requiere plantilla WhatsApp aprobada.

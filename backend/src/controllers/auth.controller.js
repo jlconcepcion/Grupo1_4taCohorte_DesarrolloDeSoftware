@@ -1,30 +1,50 @@
 const User = require('../models/User');
 const { firmarToken } = require('../config/jwt');
 const {
+  preferenciasRecordatorioPorDefecto,
+  validarPreferenciasRecordatorio,
+} = require('../config/notificaciones');
+const {
   enviarBienvenida,
   registrarNotificacionNavegacion,
 } = require('../services/notificaciones.service');
 
 const CORREO_REGEX = /^\S+@\S+\.\S+$/;
 const TELEFONO_REGEX = /^\+?[1-9]\d{1,14}$/;
+const NOMBRE_USUARIO_MAX = 40;
 
-function validarRegistro({ correo, password, telefono }) {
+function validarRegistro({ correo, password, telefono, nombreUsuario, preferenciasRecordatorio }) {
   const errores = [];
   if (!correo || !CORREO_REGEX.test(correo)) errores.push('Correo inválido');
   if (!password || password.length < 8) {
     errores.push('La contraseña debe tener al menos 8 caracteres');
   }
+  if (nombreUsuario && nombreUsuario.length > NOMBRE_USUARIO_MAX) {
+    errores.push('El nombre de usuario no puede superar los 40 caracteres');
+  }
   if (telefono && !TELEFONO_REGEX.test(telefono)) {
     errores.push('El teléfono debe estar en formato E.164');
   }
-  return errores;
+  const validacion = validarPreferenciasRecordatorio(
+    preferenciasRecordatorio ?? preferenciasRecordatorioPorDefecto()
+  );
+  errores.push(...validacion.errores);
+  return { errores, preferencias: validacion.preferencias };
 }
 
 // ST01.03: registro público de clientes.
 async function registro(req, res) {
-  const { correo, password, telefono = '' } = req.body || {};
+  const { correo, password, telefono = '', nombreUsuario = '', preferenciasRecordatorio } =
+    req.body || {};
   const telefonoNormalizado = String(telefono).trim();
-  const errores = validarRegistro({ correo, password, telefono: telefonoNormalizado });
+  const nombreUsuarioNormalizado = String(nombreUsuario).trim();
+  const { errores, preferencias } = validarRegistro({
+    correo,
+    password,
+    telefono: telefonoNormalizado,
+    nombreUsuario: nombreUsuarioNormalizado,
+    preferenciasRecordatorio,
+  });
   if (errores.length) {
     return res.status(400).json({ mensaje: 'Datos inválidos', errores });
   }
@@ -34,7 +54,9 @@ async function registro(req, res) {
       correo,
       password,
       rol: 'cliente',
+      nombreUsuario: nombreUsuarioNormalizado,
       telefono: telefonoNormalizado,
+      preferenciasRecordatorio: preferencias,
     });
 
     registrarNotificacionNavegacion({

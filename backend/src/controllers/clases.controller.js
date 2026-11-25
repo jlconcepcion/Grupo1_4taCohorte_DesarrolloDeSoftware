@@ -40,7 +40,7 @@ async function listarClases(req, res) {
 
     const clases = await Clase.find(filtro)
       .populate('recinto', 'nombre tipo capacidad activo')
-      .populate('instructor', 'correo rol');
+      .populate('instructor', 'correo nombreUsuario rol');
 
     if (req.user?.rol === 'cliente') {
       const visibles = Array.isArray(clases)

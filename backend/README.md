@@ -51,7 +51,7 @@ backend/
 │   │   └── seed.js                     # Semilla de usuarios por rol, recintos, clases y bloques iniciales
 │   ├── app.js                          # Configuración de Express y montaje de rutas
 │   └── server.js                       # Punto de entrada del servidor HTTP
-├── tests/                              # Suites de pruebas automatizadas con Jest + Supertest (80 tests)
+├── tests/                              # Suites de pruebas automatizadas con Jest + Supertest (96 tests)
 ├── Dockerfile                          # Imagen Node 22 Alpine para producción/desarrollo
 └── package.json
 ```
@@ -66,5 +66,5 @@ npm run dev                  # Levanta el servidor con nodemon en http://localho
 npm start                    # Levanta el servidor con node
 npm run migrate              # Sincroniza validadores e índices de MongoDB desde database/migrations/
 npm run seed                 # Crea/actualiza usuarios de prueba, recintos, clases y bloques en MongoDB
-npm test -- --runInBand      # Ejecuta las 9 suites de pruebas automatizadas (80 tests)
+npm test -- --runInBand      # Ejecuta las 10 suites de pruebas automatizadas (96 tests)
 ```

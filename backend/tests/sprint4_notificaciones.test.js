@@ -78,7 +78,7 @@ beforeEach(() => {
 });
 
 describe('HU04 · Notificaciones multi-canal (ST04.09 a ST04.12)', () => {
-  it('envía por correo y WhatsApp y marca éxito cuando al menos un canal llega', async () => {
+  it('envía por correo, WhatsApp y navegación y marca éxito cuando al menos un canal llega', async () => {
     whatsappAdapter.enviar.mockRejectedValueOnce(new Error('Twilio caído'));
     const reserva = reservaBase();
 
@@ -86,16 +86,19 @@ describe('HU04 · Notificaciones multi-canal (ST04.09 a ST04.12)', () => {
 
     expect(emailAdapter.enviar).toHaveBeenCalledTimes(1);
     expect(whatsappAdapter.enviar).toHaveBeenCalledTimes(1);
-    expect(Notificacion.create).toHaveBeenCalledTimes(2);
+    expect(Notificacion.create).toHaveBeenCalledTimes(3);
     expect(Notificacion.create).toHaveBeenCalledWith(
       expect.objectContaining({ canal: 'email', estado: 'enviado' })
     );
     expect(Notificacion.create).toHaveBeenCalledWith(
       expect.objectContaining({ canal: 'whatsapp', estado: 'fallido' })
     );
+    expect(Notificacion.create).toHaveBeenCalledWith(
+      expect.objectContaining({ canal: 'navegacion', estado: 'enviado' })
+    );
     expect(reserva.recordatorioEnviado).toBe(true);
     expect(reserva.tokenConfirmacion).toEqual(expect.any(String));
-    expect(resultado.resultados).toHaveLength(2);
+    expect(resultado.resultados).toHaveLength(3);
   });
 
   it('no reenvía canales que ya fueron enviados correctamente', async () => {

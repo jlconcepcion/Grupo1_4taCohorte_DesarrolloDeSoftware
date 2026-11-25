@@ -78,7 +78,7 @@ classDiagram
 | `PATCH` | `/api/reservas/:id/confirmar` | `HU16`, `ST03.08` | `coordinador`, `administrador` | Confirma cualquier reserva en estado `pendiente` (rechaza con `409` si está `cancelada`). Registra `gestionadoPor = req.user.id` y `fechaConfirmacion = new Date()`. |
 | `PATCH` | `/api/reservas/:id/cancelar` | `HU17`, `ST03.08` | `coordinador`, `administrador` | Cancela una reserva `pendiente` o `confirmada` (rechaza con `409` si ya estaba `cancelada`). Registra `gestionadoPor = req.user.id`, `fechaCancelacion = new Date()` y `motivoCancelacion` opcional, liberando el cupo. |
 | `PATCH` | `/api/reservas/:id/reasignar` | `ST03.10` | `administrador` | Permite al administrador reasignar una reserva a otro bloque, fecha o cliente validando disponibilidad en el destino y dejando registro de auditoría en `gestionadoPor`. |
-| `GET` | `/api/reservas/conteo-instructor` | `ST03.09` | `instructor`, `coordinador`, `administrador` | Devuelve por cada bloque del instructor (y fecha opcional) el conteo de reservas `pendientes`, `confirmadas`, `canceladas` y `cuposLibres`. |
+| `GET` | `/api/reservas/conteo-instructor` | `ST03.09` | `instructor`, `coordinador`, `administrador` | Devuelve por cada bloque del instructor (y fecha opcional, incluso pasada) el conteo de reservas `pendientes`, `confirmadas`, `canceladas`, `cuposLibres` y el detalle de clientes agrupado por estado. |
 
 ---
 

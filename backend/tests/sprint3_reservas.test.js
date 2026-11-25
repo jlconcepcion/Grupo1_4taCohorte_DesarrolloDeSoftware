@@ -37,7 +37,7 @@ beforeEach(() => {
 
 describe('HU10 · Consultar disponibilidad (ST03.03)', () => {
   it('devuelve solo bloques en recintos activos con cupos libres y excluye bloques llenos o inactivos', async () => {
-    // 2026-11-24 es Martes (diaSemana = 2)
+    // 2099-11-24 es Martes (diaSemana = 2)
     BloqueDisponibilidad.find.mockResolvedValue([
       {
         _id: 'blq-libre',
@@ -78,7 +78,7 @@ describe('HU10 · Consultar disponibilidad (ST03.03)', () => {
     });
 
     const res = await request(app)
-      .get('/api/reservas/disponibilidad?fecha=2026-11-24&recinto=rec-1')
+      .get('/api/reservas/disponibilidad?fecha=2099-11-24&recinto=rec-1')
       .set('Authorization', `Bearer ${tokenPara('cliente', 'cli-1')}`);
 
     expect(res.statusCode).toBe(200);
@@ -110,14 +110,14 @@ describe('HU11 · Reservar un cupo y control de concurrencia (ST03.02, ST03.05)'
       bloque: 'blq-1',
       recinto: 'rec-1',
       clase: 'cls-1',
-      fecha: '2026-11-24',
+      fecha: '2099-11-24',
       estado: 'pendiente',
     });
 
     const res = await request(app)
       .post('/api/reservas')
       .set('Authorization', `Bearer ${tokenPara('cliente', 'cli-1')}`)
-      .send({ bloqueId: 'blq-1', fecha: '2026-11-24' });
+      .send({ bloqueId: 'blq-1', fecha: '2099-11-24' });
 
     expect(res.statusCode).toBe(201);
     expect(res.body.estado).toBe('pendiente');
@@ -137,7 +137,7 @@ describe('HU11 · Reservar un cupo y control de concurrencia (ST03.02, ST03.05)'
     const res = await request(app)
       .post('/api/reservas')
       .set('Authorization', `Bearer ${tokenPara('cliente', 'cli-1')}`)
-      .send({ bloqueId: 'blq-1', fecha: '2026-11-24' });
+      .send({ bloqueId: 'blq-1', fecha: '2099-11-24' });
 
     expect(res.statusCode).toBe(409);
     expect(res.body.mensaje).toMatch(/reserva activa/i);
@@ -167,11 +167,11 @@ describe('HU11 · Reservar un cupo y control de concurrencia (ST03.02, ST03.05)'
       request(app)
         .post('/api/reservas')
         .set('Authorization', `Bearer ${tokenPara('cliente', 'cli-A')}`)
-        .send({ bloqueId: 'blq-ultimo', fecha: '2026-11-24' }),
+        .send({ bloqueId: 'blq-ultimo', fecha: '2099-11-24' }),
       request(app)
         .post('/api/reservas')
         .set('Authorization', `Bearer ${tokenPara('cliente', 'cli-B')}`)
-        .send({ bloqueId: 'blq-ultimo', fecha: '2026-11-24' }),
+        .send({ bloqueId: 'blq-ultimo', fecha: '2099-11-24' }),
     ]);
 
     const codigos = [resA.statusCode, resB.statusCode].sort();
@@ -480,7 +480,7 @@ describe('P0 · Validaciones de fecha y reasignación', () => {
       cliente: 'cli-1',
       bloque: 'blq-legacy',
       recinto: 'rec-1',
-      fecha: '2026-11-24',
+      fecha: '2099-11-24',
       estado: 'pendiente',
       save: jest.fn(),
     });
@@ -501,13 +501,13 @@ describe('P0 · Validaciones de fecha y reasignación', () => {
       .set('Authorization', `Bearer ${tokenPara('administrador', 'adm-1')}`)
       .send({
         nuevoBloqueId: 'blq-legacy',
-        nuevaFecha: '2026-11-24',
+        nuevaFecha: '2099-11-24',
         nuevoClienteId: 'cli-2',
       });
 
     expect(res.statusCode).toBe(200);
     expect(res.body.cliente).toBe('cli-2');
-    expect(res.body.fecha).toBe('2026-11-24');
+    expect(res.body.fecha).toBe('2099-11-24');
   });
 
   it('la confirmación del coordinador es idempotente', async () => {
@@ -551,5 +551,71 @@ describe('P0 · RBAC sobre rutas reales de reservas', () => {
       .get('/api/reservas/mias')
       .set('Authorization', `Bearer ${tokenPara('instructor', 'inst-rbac')}`);
     expect(res.statusCode).toBe(403);
+  });
+});
+
+describe('ST03.09 · Conteo del instructor con detalle de clientes', () => {
+  it('acepta fechas pasadas y devuelve los clientes agrupados por estado', async () => {
+    const fechaPasada = '2020-01-15';
+    BloqueDisponibilidad.find.mockResolvedValue([
+      {
+        _id: 'blq-conteo',
+        diaSemana: 3,
+        horaInicio: '10:00',
+        horaFin: '12:00',
+        capacidad: 8,
+        clase: { _id: 'cls-conteo', nombre: 'Funcional' },
+        recinto: { _id: 'rec-conteo', nombre: 'Cancha 1' },
+        instructor: { _id: 'inst-conteo', correo: 'instructor@gym.com' },
+      },
+    ]);
+    Reserva.find.mockResolvedValue([
+      {
+        _id: 'res-confirmada-conteo',
+        fecha: fechaPasada,
+        estado: 'confirmada',
+        cliente: { _id: 'cli-conf', correo: 'confirmada@gym.com', nombreUsuario: 'Ana' },
+      },
+      {
+        _id: 'res-pendiente-conteo',
+        fecha: fechaPasada,
+        estado: 'pendiente',
+        cliente: { _id: 'cli-pend', correo: 'pendiente@gym.com', nombreUsuario: '' },
+      },
+      {
+        _id: 'res-cancelada-conteo',
+        fecha: fechaPasada,
+        estado: 'cancelada',
+        cliente: { _id: 'cli-can', correo: 'cancelada@gym.com' },
+      },
+    ]);
+
+    const res = await request(app)
+      .get(`/api/reservas/conteo-instructor?fecha=${fechaPasada}`)
+      .set('Authorization', `Bearer ${tokenPara('instructor', 'inst-conteo')}`);
+
+    expect(res.statusCode).toBe(200);
+    expect(BloqueDisponibilidad.find).toHaveBeenCalledWith({ instructor: 'inst-conteo' });
+    expect(Reserva.find).toHaveBeenCalledWith({ bloque: 'blq-conteo', fecha: fechaPasada });
+    expect(res.body[0].totalReservadas).toBe(2);
+    expect(res.body[0].confirmadas).toBe(1);
+    expect(res.body[0].pendientes).toBe(1);
+    expect(res.body[0].clientes.reservadas.map((item) => item.correo)).toEqual([
+      'pendiente@gym.com',
+      'confirmada@gym.com',
+    ]);
+    expect(res.body[0].clientes.confirmadas[0].correo).toBe('confirmada@gym.com');
+    expect(res.body[0].clientes.confirmadas[0].nombreUsuario).toBe('Ana');
+    expect(res.body[0].clientes.pendientes[0].correo).toBe('pendiente@gym.com');
+    expect(res.body[0].clientes.pendientes[0].nombreUsuario).toBe('');
+    expect(res.body[0].clientes.canceladas[0].correo).toBe('cancelada@gym.com');
+  });
+
+  it('rechaza fechas con formato inválido en el conteo', async () => {
+    const res = await request(app)
+      .get('/api/reservas/conteo-instructor?fecha=15-01-2020')
+      .set('Authorization', `Bearer ${tokenPara('instructor', 'inst-conteo')}`);
+
+    expect(res.statusCode).toBe(400);
   });
 });

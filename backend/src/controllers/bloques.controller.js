@@ -82,9 +82,9 @@ async function listarBloques(req, res) {
       consulta && typeof consulta.populate === 'function'
         ? await consulta
             .populate('clase', 'nombre tipoRutina activa')
-            .populate('instructor', 'correo rol')
+            .populate('instructor', 'correo nombreUsuario rol')
             .populate('recinto', 'nombre tipo capacidad activo')
-            .populate('modificadoPor', 'correo rol')
+            .populate('modificadoPor', 'correo nombreUsuario rol')
         : await consulta;
 
     if (req.user?.rol === 'cliente' && Array.isArray(bloques)) {

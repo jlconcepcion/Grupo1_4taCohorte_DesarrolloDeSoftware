@@ -142,7 +142,7 @@ async function sincronizarContadorBloque(bloqueId, session) {
 async function poblarReservas(consulta) {
   if (consulta && typeof consulta.populate === 'function') {
     return consulta
-      .populate('cliente', 'correo rol activo')
+      .populate('cliente', 'correo nombreUsuario rol activo')
       .populate({
         path: 'bloque',
         select: 'diaSemana horaInicio horaFin capacidad instructor clase recinto',
@@ -150,7 +150,7 @@ async function poblarReservas(consulta) {
       })
       .populate('recinto', 'nombre tipo capacidad activo')
       .populate('clase', 'nombre tipoRutina instructor')
-      .populate('gestionadoPor', 'correo rol');
+      .populate('gestionadoPor', 'correo nombreUsuario rol');
   }
   return consulta;
 }
@@ -187,7 +187,7 @@ async function consultarDisponibilidad(req, res) {
         ? await consulta
             .populate('recinto', 'nombre tipo capacidad activo')
             .populate('clase', 'nombre tipoRutina activa')
-            .populate('instructor', 'correo rol')
+            .populate('instructor', 'correo nombreUsuario rol')
         : await consulta;
 
     const disponibles = [];
@@ -924,9 +924,6 @@ async function conteoReservasPorInstructor(req, res) {
     if (fecha && !esFechaCalendarioValida(fecha)) {
       return res.status(400).json({ mensaje: 'El formato de fecha debe ser YYYY-MM-DD' });
     }
-    if (fecha && !esFechaFutura(fecha)) {
-      return res.status(400).json({ mensaje: 'La fecha debe ser futura o el día de hoy' });
-    }
 
     const filtroBloques = {};
 
@@ -942,10 +939,22 @@ async function conteoReservasPorInstructor(req, res) {
         ? await consulta
             .populate('clase', 'nombre tipoRutina')
             .populate('recinto', 'nombre tipo capacidad')
-            .populate('instructor', 'correo rol')
+            .populate('instructor', 'correo nombreUsuario rol')
         : await consulta;
 
     const resumen = [];
+    const resumenCliente = (reserva) => {
+      const cliente = reserva?.cliente && typeof reserva.cliente === 'object' ? reserva.cliente : null;
+      return {
+        reservaId: reserva?._id || null,
+        clienteId: cliente?._id || reserva?.cliente || null,
+        correo: cliente?.correo || 'Cliente no disponible',
+        nombreUsuario: cliente?.nombreUsuario || '',
+        fecha: reserva?.fecha || null,
+        estado: reserva?.estado || null,
+        fechaConfirmacion: reserva?.fechaConfirmacion || null,
+      };
+    };
 
     for (const b of bloques || []) {
       const filtroBase = { bloque: b._id };
@@ -953,13 +962,24 @@ async function conteoReservasPorInstructor(req, res) {
         filtroBase.fecha = fecha;
       }
 
-      const [pendientes, confirmadas, canceladas] = await Promise.all([
-        Reserva.countDocuments({ ...filtroBase, estado: 'pendiente' }),
-        Reserva.countDocuments({ ...filtroBase, estado: 'confirmada' }),
-        Reserva.countDocuments({ ...filtroBase, estado: 'cancelada' }),
-      ]);
+      const consultaReservas = Reserva.find(filtroBase);
+      const reservas =
+        consultaReservas && typeof consultaReservas.populate === 'function'
+          ? await consultaReservas.populate('cliente', 'correo nombreUsuario rol activo')
+          : await consultaReservas;
+      const listaReservas = Array.isArray(reservas) ? reservas : [];
 
-      const totalReservadas = Number(pendientes || 0) + Number(confirmadas || 0);
+      const pendientes = listaReservas.filter((r) => r.estado === 'pendiente');
+      const confirmadas = listaReservas.filter((r) => r.estado === 'confirmada');
+      const canceladas = listaReservas.filter((r) => r.estado === 'cancelada');
+      const clientes = {
+        reservadas: [...pendientes, ...confirmadas].map(resumenCliente),
+        confirmadas: confirmadas.map(resumenCliente),
+        pendientes: pendientes.map(resumenCliente),
+        canceladas: canceladas.map(resumenCliente),
+      };
+
+      const totalReservadas = pendientes.length + confirmadas.length;
       const capacidad = Number(b.capacidad || 0);
       const cuposLibres = Math.max(0, capacidad - totalReservadas);
 
@@ -974,10 +994,11 @@ async function conteoReservasPorInstructor(req, res) {
         instructor: b.instructor,
         fechaFiltro: fecha || null,
         totalReservadas,
-        pendientes: Number(pendientes || 0),
-        confirmadas: Number(confirmadas || 0),
-        canceladas: Number(canceladas || 0),
+        pendientes: pendientes.length,
+        confirmadas: confirmadas.length,
+        canceladas: canceladas.length,
         cuposLibres,
+        clientes,
       });
     }
 

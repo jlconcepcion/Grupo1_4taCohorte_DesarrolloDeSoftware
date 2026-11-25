@@ -144,7 +144,7 @@ Disponible en http://localhost:5173 (Vite redirige `/api` al backend en el puert
 
 ---
 
-## Endpoints de la API REST (Sprints 1, 2 y 3)
+## Endpoints de la API REST (Sprints 1-4)
 
 | Método | Ruta | Descripción | Roles autorizados |
 | :--- | :--- | :--- | :--- |
@@ -153,7 +153,8 @@ Disponible en http://localhost:5173 (Vite redirige `/api` al backend en el puert
 | `POST` | `/api/auth/login` | Inicio de sesión con JWT (`HU02`) | Público |
 | `GET` | `/api/auth/perfil` | Perfil del usuario autenticado (`HU02`) | Todos los roles autenticados |
 | `GET` | `/api/usuarios` | Listado de usuarios registrados (`HU03`) | `administrador` |
-| `POST` | `/api/usuarios` | Crear usuario o instructor con rol (`HU03`) | `administrador` |
+| `POST` | `/api/usuarios` | Crear usuario o instructor con rol y nombre opcional (`HU03`, `ST04.16`) | `administrador` |
+| `PATCH` | `/api/usuarios/:id` | Editar nombre de usuario y teléfono propios o de cualquier usuario (`ST04.16`) | Dueño de la cuenta, `administrador` |
 | `GET` | `/api/recintos` | Listar recintos (clientes solo ven activos) (`HU04`, `HU05`) | Todos los roles autenticados |
 | `POST` | `/api/recintos` | Crear nuevo recinto activo (`HU04`) | `administrador` |
 | `PUT / PATCH` | `/api/recintos/:id` | Actualizar datos o activar/desactivar recinto (`HU05`) | `administrador` |
@@ -187,7 +188,7 @@ Disponible en http://localhost:5173 (Vite redirige `/api` al backend en el puert
 ## Pruebas Automatizadas y Documentación
 
 ```bash
-cd backend && npm test -- --runInBand   # 9 suites / 80 pruebas en Jest + Supertest (Sprints 1-4)
+cd backend && npm test -- --runInBand   # 10 suites / 96 pruebas en Jest + Supertest (Sprints 1-4)
 cd frontend && npm run build            # Verificación de compilación de React + Vite
 ```
 
