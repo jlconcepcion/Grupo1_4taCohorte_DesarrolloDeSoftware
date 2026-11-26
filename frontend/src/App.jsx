@@ -5,6 +5,13 @@ import Dashboard from './pages/Dashboard.jsx';
 import Landing from './pages/Landing.jsx';
 import { auth, cerrarSesion, getToken, getUsuario, guardarSesion } from './api.js';
 
+const ETIQUETAS_ROL = {
+  administrador: 'Administrador',
+  coordinador: 'Coordinador',
+  instructor: 'Instructor',
+  cliente: 'Cliente',
+};
+
 export default function App() {
   const [usuario, setUsuario] = useState(getUsuario);
   const [vista, setVista] = useState('landing');
@@ -35,6 +42,16 @@ export default function App() {
     if (!avisoConfirmacion) return;
     window.history.replaceState({}, '', window.location.pathname);
   }, [avisoConfirmacion]);
+
+  useEffect(() => {
+    if (!autenticado || !usuario) {
+      document.title = 'FitBook';
+      return;
+    }
+    const nombre = usuario.nombreUsuario || usuario.correo?.split('@')[0];
+    const rol = ETIQUETAS_ROL[usuario.rol] || 'Usuario';
+    document.title = nombre ? `FitBook · ${nombre} · ${rol}` : `FitBook · ${rol}`;
+  }, [autenticado, usuario]);
 
   function iniciarSesion(token, datos) {
     guardarSesion(token, datos);

@@ -336,6 +336,8 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
     rol: 'cliente',
     preferenciasRecordatorio: preferenciasRecordatorioIniciales(),
   });
+  const [formularioRecintoAbierto, setFormularioRecintoAbierto] = useState(false);
+  const [formularioUsuarioAbierto, setFormularioUsuarioAbierto] = useState(false);
 
   // Estado para formulario de Clases (Instructor)
   const [formClase, setFormClase] = useState({
@@ -786,6 +788,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
         setMensajeExito('Recinto creado y activado correctamente.');
       }
       setFormRecinto({ id: null, nombre: '', tipo: 'Fútbol 5', capacidad: 10, descripcion: '' });
+      setFormularioRecintoAbierto(false);
       await cargarDatos();
     } catch (err) {
       setMensajeError(err.errores?.join(' · ') || err.message);
@@ -826,6 +829,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
         rol: 'cliente',
         preferenciasRecordatorio: preferenciasRecordatorioIniciales(),
       });
+      setFormularioUsuarioAbierto(false);
       await cargarDatos();
       await cargarNotificacionesNavegacion();
     } catch (err) {
@@ -1976,7 +1980,26 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
 
                 {vistaAdmin === 'recintos' && (
                   <div className="space-y-6">
-                    {/* Gestión de Recintos */}
+                    <div className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
+                      <button
+                        type="button"
+                        onClick={() => setFormularioRecintoAbierto((abierto) => !abierto)}
+                        aria-expanded={formularioRecintoAbierto}
+                        className="flex w-full flex-wrap items-center justify-between gap-3 text-left"
+                      >
+                        <span>
+                          <span className="block text-lg font-bold">Crear recintos</span>
+                          <span className="mt-1 block text-xs text-slate-400">
+                            Despliega esta sección para registrar o actualizar un recinto.
+                          </span>
+                        </span>
+                        <span className="rounded-xl bg-[#1268e8] px-3 py-2 text-xs font-bold text-white">
+                          {formularioRecintoAbierto ? 'Ocultar formulario' : 'Crear recinto'}
+                        </span>
+                      </button>
+                    </div>
+
+                    {formularioRecintoAbierto && (
                     <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
                       <h2 className="text-xl font-bold">
                         {formRecinto.id ? 'Editar Recinto' : 'Crear Nuevo Recinto'}
@@ -2038,15 +2061,16 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                           {formRecinto.id && (
                             <button
                               type="button"
-                              onClick={() =>
+                              onClick={() => {
                                 setFormRecinto({
                                   id: null,
                                   nombre: '',
                                   tipo: 'Fútbol 5',
                                   capacidad: 10,
                                   descripcion: '',
-                                })
-                              }
+                                });
+                                setFormularioRecintoAbierto(false);
+                              }}
                               className="secondary-button !py-2.5 text-sm"
                             >
                               Cancelar
@@ -2055,6 +2079,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                         </div>
                       </form>
                     </div>
+                    )}
 
                     <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
                       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -2093,15 +2118,16 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                             <div className="flex gap-2">
                               <button
                                 type="button"
-                                onClick={() =>
+                                onClick={() => {
                                   setFormRecinto({
                                     id: r._id,
                                     nombre: r.nombre,
                                     tipo: r.tipo,
                                     capacidad: r.capacidad,
                                     descripcion: r.descripcion || '',
-                                  })
-                                }
+                                  });
+                                  setFormularioRecintoAbierto(true);
+                                }}
                                 className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold hover:bg-slate-50"
                               >
                                 Editar
@@ -2131,14 +2157,31 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
 
                 {vistaAdmin === 'usuarios' && (
                   <div className="space-y-6">
-                    {/* Creación de Usuarios e Instructores */}
+                    <div className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
+                      <button
+                        type="button"
+                        onClick={() => setFormularioUsuarioAbierto((abierto) => !abierto)}
+                        aria-expanded={formularioUsuarioAbierto}
+                        className="flex w-full flex-wrap items-center justify-between gap-3 text-left"
+                      >
+                        <span>
+                          <span className="block text-lg font-bold">Crear cuenta con rol</span>
+                          <span className="mt-1 block text-xs text-slate-400">
+                            Despliega esta sección para registrar una nueva cuenta.
+                          </span>
+                        </span>
+                        <span className="rounded-xl bg-[#1268e8] px-3 py-2 text-xs font-bold text-white">
+                          {formularioUsuarioAbierto ? 'Ocultar formulario' : 'Crear cuenta con rol'}
+                        </span>
+                      </button>
+                    </div>
+
+                    {formularioUsuarioAbierto && (
                     <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
-                        <h2 className="text-xl font-bold">
-                          Crear Usuario
-                        </h2>
-                        <p className="mt-1 text-xs text-slate-400">
-                          Selecciona Cliente para que la cuenta pueda reservar. El rol instructor coordina horarios y no reserva cupos.
-                        </p>
+                      <h2 className="text-xl font-bold">Crear Usuario</h2>
+                      <p className="mt-1 text-xs text-slate-400">
+                        Selecciona Cliente para que la cuenta pueda reservar. El rol instructor coordina horarios y no reserva cupos.
+                      </p>
 
                       <form onSubmit={guardarNuevoUsuario} className="mt-4 space-y-3">
                         <div>
@@ -2231,6 +2274,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                         </button>
                       </form>
                     </div>
+                    )}
 
                     <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
                       <div className="flex flex-wrap items-start justify-between gap-3">
