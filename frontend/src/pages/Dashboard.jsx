@@ -318,7 +318,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
     preferenciasRecordatorioIniciales
   );
 
-  // Estado para formulario de Recintos (HU04 / HU05 - Administrador)
+  // Estado para formulario de Recintos (Administrador)
   const [formRecinto, setFormRecinto] = useState({
     id: null,
     nombre: '',
@@ -327,7 +327,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
     descripcion: '',
   });
 
-  // Estado para formulario de Usuarios (HU03 - Administrador)
+  // Estado para formulario de Usuarios (Administrador)
   const [formUsuario, setFormUsuario] = useState({
     correo: '',
     nombreUsuario: '',
@@ -337,7 +337,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
     preferenciasRecordatorio: preferenciasRecordatorioIniciales(),
   });
 
-  // Estado para formulario de Clases (HU06 - Instructor)
+  // Estado para formulario de Clases (Instructor)
   const [formClase, setFormClase] = useState({
     id: null,
     nombre: '',
@@ -345,7 +345,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
     recinto: '',
   });
 
-  // Estado para formulario de Bloques (HU07 / HU08 / HU09 - Instructor / Coordinador / Admin)
+  // Estado para formulario de Bloques (Instructor / Coordinador / Admin)
   const [formBloque, setFormBloque] = useState({
     id: null,
     clase: '',
@@ -362,7 +362,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
   const [filtroRecinto, setFiltroRecinto] = useState('');
   const [filtroDia, setFiltroDia] = useState('');
 
-  // Filtros de Disponibilidad y Mis Reservas para el Cliente (HU10, HU11, HU13)
+  // Filtros de Disponibilidad y Mis Reservas para el Cliente
   const [vistaCliente, setVistaCliente] = useState('disponibilidad');
   const [filtroDispFecha, setFiltroDispFecha] = useState('');
   const [filtroDispRecinto, setFiltroDispRecinto] = useState('');
@@ -370,7 +370,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
   const [filtroDispInstructor, setFiltroDispInstructor] = useState('');
   const [filtroTipoMisReservas, setFiltroTipoMisReservas] = useState('todas');
 
-  // Filtros del Panel de Reservas para Coordinador y Administrador (HU15 - HU17, ST03.07)
+  // Filtros del Panel de Reservas para Coordinador y Administrador
   const [filtroResFecha, setFiltroResFecha] = useState('');
   const [filtroResRecinto, setFiltroResRecinto] = useState('');
   const [filtroResClase, setFiltroResClase] = useState('');
@@ -380,7 +380,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
   const [conteosExpandidos, setConteosExpandidos] = useState({});
   const [motivoCancelacionCoord, setMotivoCancelacionCoord] = useState('');
 
-  // Formulario de Reasignación de Reserva exclusiva del Administrador (ST03.10)
+  // Formulario de Reasignación de Reserva exclusiva del Administrador
   const [formReasignar, setFormReasignar] = useState({
     reservaId: null,
     nuevoBloqueId: '',
@@ -388,7 +388,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
     nuevoClienteId: '',
   });
 
-  // Estado y filtros de Épica 5 · Sugerencias e Indicadores (ST05.02 - ST05.06)
+  // Estado y filtros de Sugerencias e Indicadores
   const [formSugerencia, setFormSugerencia] = useState({
     recinto: '',
     clase: '',
@@ -754,7 +754,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
   const todasSugerenciasPaginadas = paginar(todasSugerencias, paginaTodasSugerencias);
 
   // ===========================================================================
-  // Acciones Administrador: Recintos (HU04, HU05, ST02.03) y Usuarios (HU03)
+  // Acciones Administrador: Recintos y Usuarios
   // ===========================================================================
   async function guardarRecinto(e) {
     e.preventDefault();
@@ -822,7 +822,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
   }
 
   // ===========================================================================
-  // Acciones Instructor: Clases (HU06) y Bloques Propios (HU07, HU08, ST02.08)
+  // Acciones Instructor: Clases y Bloques Propios
   // ===========================================================================
   async function guardarClase(e) {
     e.preventDefault();
@@ -923,7 +923,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
   }
 
   // ===========================================================================
-  // Acciones Sprint 3 · Reservas (Cliente: HU11, HU12, HU14 · Coord/Admin: HU16, HU17, ST03.10)
+  // Acciones de Reservas (Cliente, Coordinador y Administrador)
   // ===========================================================================
   async function reservarCupoCliente(itemDisp) {
     limpiarAvisos();
@@ -1027,7 +1027,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
   }
 
   // ===========================================================================
-  // Acciones Sprint 4 · Épica 5: Quejas, Sugerencias e Indicadores (ST05.02 - ST05.06)
+  // Acciones de Quejas, Sugerencias e Indicadores
   // ===========================================================================
   async function enviarSugerenciaCliente(e) {
     e.preventDefault();
@@ -1381,7 +1381,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
         ) : (
           <div className="mt-8 space-y-10">
             {/* ===============================================================
-                VISTA CLIENTE: Disponibilidad, Reserva y Mis Reservas (HU10-HU14)
+                VISTA CLIENTE: Disponibilidad, Reserva y Mis Reservas
             =============================================================== */}
             {usuario?.rol === 'cliente' && (
               <div className="space-y-6">
@@ -1426,7 +1426,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                     <div className="flex flex-wrap items-center justify-between gap-4">
                       <div>
                         <h2 className="text-xl font-bold">
-                          Horarios Disponibles con Cupos Libres (HU10 · HU11)
+                          Horarios Disponibles con Cupos Libres
                         </h2>
                         <p className="mt-1 text-xs text-slate-400">
                           Filtra por fecha, recinto activo, clase o instructor y solicita tu cupo en línea.
@@ -1564,7 +1564,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                     <div className="flex flex-wrap items-center justify-between gap-4">
                       <div>
                         <h2 className="text-xl font-bold">
-                          Mis Reservas (HU12 · HU13 · HU14)
+                          Mis Reservas
                         </h2>
                         <p className="mt-1 text-xs text-slate-400">
                           Confirma tu asistencia hasta 1 hora antes del inicio o cancela para liberar tu cupo.
@@ -1672,10 +1672,10 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
 
                 {vistaCliente === 'sugerencias' && (
                   <div className="grid gap-6 lg:grid-cols-2">
-                    {/* Formulario de envío de Quejas y Sugerencias (ST05.02) */}
+                    {/* Formulario de envío de Quejas y Sugerencias */}
                     <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
                       <h2 className="text-xl font-bold">
-                        Buzón de Quejas y Sugerencias (ST05.02)
+                        Buzón de Quejas y Sugerencias
                       </h2>
                       <p className="mt-1 text-xs text-slate-400">
                         Cuéntanos tu experiencia sobre un recinto o clase (máximo 500 caracteres).
@@ -1890,10 +1890,10 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
 
                 {vistaAdmin === 'recintos' && (
                   <div className="space-y-6">
-                    {/* Gestión de Recintos (ST02.03) */}
+                    {/* Gestión de Recintos */}
                     <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
                       <h2 className="text-xl font-bold">
-                        {formRecinto.id ? 'Editar Recinto (HU05)' : 'Crear Nuevo Recinto (HU04)'}
+                        {formRecinto.id ? 'Editar Recinto' : 'Crear Nuevo Recinto'}
                       </h2>
                       <p className="mt-1 text-xs text-slate-400">
                         Desactivar un recinto lo oculta para nuevas reservas conservando su historial.
@@ -2045,10 +2045,10 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
 
                 {vistaAdmin === 'usuarios' && (
                   <div className="space-y-6">
-                    {/* Creación de Usuarios e Instructores (HU03 / ST01.07) */}
+                    {/* Creación de Usuarios e Instructores */}
                     <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
                         <h2 className="text-xl font-bold">
-                          Crear Usuario (HU03)
+                          Crear Usuario
                         </h2>
                         <p className="mt-1 text-xs text-slate-400">
                           Selecciona Cliente para que la cuenta pueda reservar. El rol instructor coordina horarios y no reserva cupos.
@@ -2208,7 +2208,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
             )}
 
             {/* ===============================================================
-                VISTA INSTRUCTOR: Clases (HU06), Bloques (HU07/HU08) y Conteo (ST03.09)
+                VISTA INSTRUCTOR: Clases, Bloques y Conteo
             =============================================================== */}
             {usuario?.rol === 'instructor' && (
               <div className="space-y-6">
@@ -2257,7 +2257,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                     {formularioClaseAbierto && (
                     <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
                       <h2 className="text-xl font-bold">
-                        {formClase.id ? 'Editar Mi Clase (HU06)' : 'Crear Nueva Clase (HU06)'}
+                        {formClase.id ? 'Editar Mi Clase' : 'Crear Nueva Clase'}
                       </h2>
                       <p className="mt-1 text-xs text-slate-400">
                         Solo se pueden asociar clases a recintos activos.
@@ -2334,7 +2334,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                     )}
 
                     <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
-                      <h2 className="text-xl font-bold">Mis Clases (HU06)</h2>
+                      <h2 className="text-xl font-bold">Mis Clases</h2>
                       <p className="mt-1 text-xs text-slate-400">
                         Tus clases publicadas, de 5 en 5.
                       </p>
@@ -2413,8 +2413,8 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                     <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
                       <h2 className="text-xl font-bold">
                         {formBloque.id
-                          ? 'Actualizar Bloque de Horario (HU08)'
-                          : 'Publicar Bloque de Disponibilidad (HU07)'}
+                          ? 'Actualizar Bloque de Horario'
+                          : 'Publicar Bloque de Disponibilidad'}
                       </h2>
                       <p className="mt-1 text-xs text-slate-400">
                         Valida automáticamente que la hora fin sea posterior al inicio y que no haya solapamientos.
@@ -2563,7 +2563,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                     )}
 
                     <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
-                      <h2 className="text-xl font-bold">Mis Bloques (HU07 / HU08)</h2>
+                      <h2 className="text-xl font-bold">Mis Bloques</h2>
                       <p className="mt-1 text-xs text-slate-400">
                         Solo se muestran bloques con una próxima sesión pendiente.
                       </p>
@@ -2617,7 +2617,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                 {vistaInstructor === 'conteo' && (
                   <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
                     <h2 className="text-xl font-bold">
-                      Conteo de Reservas y Confirmaciones por Clase y Horario (ST03.09)
+                      Conteo de Reservas y Confirmaciones por Clase y Horario
                     </h2>
                     <p className="mt-1 text-xs text-slate-400">
                       Toca una tarjeta para ver los clientes por estado. Puedes filtrar por fechas pasadas para revisar clases ya realizadas.
@@ -2768,7 +2768,6 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
 
             {/* ===============================================================
                 PANEL DE CONTROL DE RESERVAS PARA COORDINADOR Y ADMIN
-                (HU15, HU16, HU17, ST03.07, ST03.08, ST03.10)
             =============================================================== */}
             {((usuario?.rol === 'coordinador' && vistaCoordinador === 'reservas') ||
               (usuario?.rol === 'administrador' && vistaAdmin === 'reservas')) && (
@@ -2776,7 +2775,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div>
                     <h2 className="text-xl font-bold">
-                      Panel de Control de Reservas (HU15 · HU16 · HU17)
+                      Panel de Control de Reservas
                     </h2>
                     <p className="mt-1 text-xs text-slate-400">
                       Filtra por fecha, recinto, clase, instructor o estado para confirmar asistencias o cancelar reservas no confirmadas y liberar cupos.
@@ -2873,7 +2872,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                   </div>
                 </div>
 
-                {/* Formulario en línea para Reasignación exclusiva de Administrador (ST03.10) */}
+                {/* Formulario en línea para Reasignación exclusiva de Administrador */}
                 {usuario?.rol === 'administrador' && formReasignar.reservaId && (
                   <form
                     id="panel-reasignacion"
@@ -2881,7 +2880,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                     className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-blue-200 bg-blue-50/50 p-4"
                   >
                     <span className="text-xs font-bold text-[#1268e8]">
-                      Reasignar reserva (ST03.10):
+                      Reasignar reserva:
                     </span>
                     <select
                       required
@@ -3070,19 +3069,18 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
             )}
 
             {/* ===============================================================
-                ÉPICA 5 · PANEL DE SUGERENCIAS E INDICADORES DE DESEMPEÑO
-                (Coordinador: ST05.04 · Administrador: ST05.05 y ST05.06)
+                PANEL DE SUGERENCIAS E INDICADORES DE DESEMPEÑO
             =============================================================== */}
             {((usuario?.rol === 'coordinador' && vistaCoordinador === 'sugerencias') ||
               (usuario?.rol === 'administrador' && vistaAdmin === 'sugerencias')) && (
               <div className="space-y-6">
-                {/* Panel de Indicadores exclusivo del Administrador (ST05.05 y ST05.06) */}
+                {/* Panel de Indicadores exclusivo del Administrador */}
                 {usuario?.rol === 'administrador' && indicadoresSugerencias && (
                   <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
                     <div className="flex flex-wrap items-center justify-between gap-4">
                       <div>
                         <h2 className="text-xl font-bold">
-                          Indicadores de Desempeño basados en Sugerencias (ST05.05 · ST05.06)
+                          Indicadores de Desempeño basados en Sugerencias
                         </h2>
                         <p className="mt-1 text-xs text-slate-400">
                           Conteo de quejas y sugerencias por recinto, clase y categoría en el periodo seleccionado.
@@ -3159,7 +3157,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                       </div>
                     </div>
 
-                    {/* Gráficos simples de barras y tablas por Recinto, Clase y Categoría (ST05.06) */}
+                    {/* Gráficos simples de barras y tablas por Recinto, Clase y Categoría */}
                     <div className="mt-6 grid gap-6 lg:grid-cols-3">
                       <div className="rounded-2xl border border-slate-100 p-4">
                         <h3 className="text-sm font-bold">Por Recinto</h3>
@@ -3262,12 +3260,12 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                   </div>
                 )}
 
-                {/* Listado de Quejas y Sugerencias para Coordinador y Administrador (ST05.04) */}
+                {/* Listado de Quejas y Sugerencias para Coordinador y Administrador */}
                 <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
                   <div className="flex flex-wrap items-center justify-between gap-4">
                     <div>
                       <h2 className="text-xl font-bold">
-                        Buzón de Quejas y Sugerencias de Clientes (ST05.04)
+                        Buzón de Quejas y Sugerencias de Clientes
                       </h2>
                       <p className="mt-1 text-xs text-slate-400">
                         Filtra por recinto, categoría o estado y marca cada sugerencia como revisada.
@@ -3417,14 +3415,14 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
             )}
 
             {/* ===============================================================
-                VISTA COORDINADOR / ADMIN: Edición de bloques (HU09, ST02.09)
+                VISTA COORDINADOR / ADMIN: Edición de bloques
             =============================================================== */}
             {((usuario?.rol === 'coordinador' && vistaCoordinador === 'horarios') ||
               usuario?.rol === 'administrador') &&
               formBloque.id && (
                 <div className="rounded-[22px] border border-blue-200 bg-white p-6 shadow-sm">
                   <h2 className="text-lg font-bold">
-                    Edición Operativa de Bloque de Horario (HU09 · Auditoría Activa)
+                    Edición Operativa de Bloque de Horario (Auditoría Activa)
                   </h2>
                   <form onSubmit={guardarBloque} className="mt-4 grid gap-3 sm:grid-cols-5">
                     <select
@@ -3496,8 +3494,8 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                 <div>
                   <h2 className="text-xl font-bold">
                     {usuario?.rol === 'cliente'
-                      ? 'Catálogo General de Recintos y Horarios (ST02.10)'
-                      : 'Horarios y Bloques de Disponibilidad por Recinto (HU07–HU09)'}
+                      ? 'Catálogo General de Recintos y Horarios'
+                      : 'Horarios y Bloques de Disponibilidad por Recinto'}
                   </h2>
                   <p className="mt-1 text-xs text-slate-400">
                     Filtra por recinto o día de la semana para consultar la programación vigente.
