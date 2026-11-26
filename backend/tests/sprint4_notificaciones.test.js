@@ -19,6 +19,7 @@ const request = require('supertest');
 const app = require('../src/app');
 const { firmarToken } = require('../src/config/jwt');
 const User = require('../src/models/User');
+const Clase = require('../src/models/Clase');
 const Reserva = require('../src/models/Reserva');
 const Notificacion = require('../src/models/Notificacion');
 const BloqueDisponibilidad = require('../src/models/BloqueDisponibilidad');
@@ -386,5 +387,99 @@ describe('HU04 · Notificaciones multi-canal (ST04.09 a ST04.12)', () => {
     expect(resultado.estado).toBe('enviado');
     expect(resultado.proveedorId).toMatch(/^simulado-/);
     delete process.env.TWILIO_MODO_SIMULACION;
+  });
+
+  it('el administrador envía la lista de confirmados por clase al instructor por correo y navegación', async () => {
+    Clase.findById.mockResolvedValue({
+      _id: 'cls-func',
+      nombre: 'Entrenamiento Funcional',
+      recinto: { _id: 'rec-1', nombre: 'Sala Funcional Principal' },
+      instructor: {
+        _id: 'inst-1',
+        correo: 'instructor@gym.com',
+        nombreUsuario: 'Carlos Coach',
+        rol: 'instructor',
+      },
+    });
+
+    Reserva.find.mockResolvedValue([
+      {
+        _id: 'res-conf-1',
+        fecha: '2099-11-24',
+        estado: 'confirmada',
+        cliente: { _id: 'cli-1', correo: 'ana@gym.com', nombreUsuario: 'Ana' },
+        bloque: { horaInicio: '16:00', horaFin: '18:00' },
+      },
+      {
+        _id: 'res-pend-1',
+        fecha: '2099-11-24',
+        estado: 'pendiente',
+        cliente: { _id: 'cli-2', correo: 'luis@gym.com', nombreUsuario: '' },
+        bloque: { horaInicio: '16:00', horaFin: '18:00' },
+      },
+    ]);
+
+    const res = await request(app)
+      .post('/api/notificaciones/enviar-mensaje')
+      .set('Authorization', `Bearer ${tokenPara('administrador', 'admin-1')}`)
+      .send({
+        claseId: 'cls-func',
+        fecha: '2099-11-24',
+        mensaje: 'Hola Carlos, te comparto la lista actualizada de tu clase.',
+      });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.totalDestinatarios).toBe(1);
+    expect(res.body.resumenClase.totales).toEqual({
+      confirmadas: 1,
+      pendientes: 1,
+      canceladas: 0,
+      total: 2,
+    });
+    expect(emailAdapter.enviar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        destino: 'instructor@gym.com',
+        asunto: expect.stringContaining('Lista de confirmados · Entrenamiento Funcional'),
+        texto: expect.stringContaining('Ana (ana@gym.com)'),
+      })
+    );
+    expect(Notificacion.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        canal: 'navegacion',
+        destinatario: 'inst-1',
+        tipo: 'resumen_instructor',
+      })
+    );
+  });
+
+  it('el administrador envía un mensaje de correo a un usuario o rol y bloquea a clientes con 403', async () => {
+    const resProhibido = await request(app)
+      .post('/api/notificaciones/enviar-mensaje')
+      .set('Authorization', `Bearer ${tokenPara('cliente', 'cli-1')}`)
+      .send({ rolDestino: 'coordinador', mensaje: 'Intento no autorizado' });
+    expect(resProhibido.statusCode).toBe(403);
+
+    User.find.mockResolvedValue([
+      { _id: 'coord-1', correo: 'coordinador@gym.com', rol: 'coordinador', activo: true },
+    ]);
+
+    const res = await request(app)
+      .post('/api/notificaciones/enviar-mensaje')
+      .set('Authorization', `Bearer ${tokenPara('administrador', 'admin-1')}`)
+      .send({
+        rolDestino: 'coordinador',
+        asunto: 'Aviso operativo de coordinación',
+        mensaje: 'Por favor revisar las reservas pendientes de hoy.',
+      });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.totalDestinatarios).toBe(1);
+    expect(emailAdapter.enviar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        destino: 'coordinador@gym.com',
+        asunto: 'Aviso operativo de coordinación',
+        texto: 'Por favor revisar las reservas pendientes de hoy.',
+      })
+    );
   });
 });

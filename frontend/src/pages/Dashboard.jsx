@@ -403,6 +403,18 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
   const [paginaMisSugerencias, setPaginaMisSugerencias] = useState(1);
   const [paginaTodasSugerencias, setPaginaTodasSugerencias] = useState(1);
 
+  // Estado para envío manual de correos y lista de confirmados por clase (Admin y Coordinador)
+  const [panelCorreoAbierto, setPanelCorreoAbierto] = useState(false);
+  const [formCorreoAdmin, setFormCorreoAdmin] = useState({
+    modoDestino: 'instructor_clase',
+    destinatarioId: '',
+    rolDestino: 'instructor',
+    claseId: '',
+    fecha: '',
+    asunto: '',
+    mensaje: '',
+  });
+
   // Navegación y paginación
   const [vistaAdmin, setVistaAdmin] = useState('recintos');
   const [vistaCoordinador, setVistaCoordinador] = useState('reservas');
@@ -1064,6 +1076,80 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
       await cargarDatos();
     } catch (err) {
       setMensajeError(mensajeErrorAccion(err, 'No se pudo actualizar la sugerencia'));
+    } finally {
+      setAccionEnCurso(false);
+    }
+  }
+
+  function prepararCorreoParaUsuario(usuarioDestino) {
+    if (!usuarioDestino) return;
+    limpiarAvisos();
+    setFormCorreoAdmin((prev) => ({
+      ...prev,
+      modoDestino: 'usuario',
+      destinatarioId: usuarioDestino._id || '',
+    }));
+    setPanelCorreoAbierto(true);
+    window.setTimeout(() => {
+      document
+        .getElementById('panel-envio-correo')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 80);
+  }
+
+  async function enviarCorreoNotificacion(e) {
+    e.preventDefault();
+    limpiarAvisos();
+
+    if (formCorreoAdmin.modoDestino === 'instructor_clase' && !formCorreoAdmin.claseId) {
+      setMensajeError('Selecciona una clase para enviar la lista de confirmados a su instructor.');
+      return;
+    }
+    if (formCorreoAdmin.modoDestino === 'usuario' && !formCorreoAdmin.destinatarioId) {
+      setMensajeError('Selecciona un usuario destinatario.');
+      return;
+    }
+    if (!formCorreoAdmin.claseId && !formCorreoAdmin.mensaje.trim()) {
+      setMensajeError('Escribe un mensaje o selecciona una clase para enviar su lista de confirmados.');
+      return;
+    }
+
+    setAccionEnCurso(true);
+    try {
+      const payload = {
+        asunto: formCorreoAdmin.asunto.trim(),
+        mensaje: formCorreoAdmin.mensaje.trim(),
+        claseId: formCorreoAdmin.claseId || '',
+        fecha: formCorreoAdmin.fecha || '',
+      };
+
+      if (formCorreoAdmin.modoDestino === 'usuario') {
+        payload.destinatarioId = formCorreoAdmin.destinatarioId;
+      } else if (formCorreoAdmin.modoDestino === 'rol') {
+        payload.rolDestino = formCorreoAdmin.rolDestino;
+      } else {
+        payload.destinatarioId = 'instructor_clase';
+      }
+
+      const resp = await notificacionesApi.enviarMensaje(payload);
+      const detalleClase = resp?.resumenClase
+        ? ` · Clase: ${resp.resumenClase.clase} (${resp.resumenClase.totales?.confirmadas || 0} confirmados, ${resp.resumenClase.totales?.pendientes || 0} pendientes)`
+        : '';
+      const correosEnviados = Array.isArray(resp?.resultados)
+        ? resp.resultados.map((r) => r.correo).join(', ')
+        : '';
+
+      setMensajeExito(
+        `Correo enviado exitosamente a ${correosEnviados || `${resp?.totalDestinatarios || 1} destinatario(s)`}${detalleClase}.`
+      );
+      setFormCorreoAdmin((prev) => ({
+        ...prev,
+        asunto: '',
+        mensaje: '',
+      }));
+      await cargarNotificacionesNavegacion();
+    } catch (err) {
+      setMensajeError(mensajeErrorAccion(err, 'No se pudo enviar el correo'));
     } finally {
       setAccionEnCurso(false);
     }
@@ -2189,6 +2275,13 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                               >
                                 Preferencias
                               </button>
+                              <button
+                                type="button"
+                                onClick={() => prepararCorreoParaUsuario(u)}
+                                className="rounded-lg border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-bold text-[#1268e8] hover:bg-blue-100"
+                              >
+                                Enviar correo
+                              </button>
                             </div>
                           </div>
                         ))}
@@ -2201,6 +2294,208 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                         totalRegistros={usuarios.length}
                         onCambiar={setPaginaUsuarios}
                       />
+                    </div>
+
+                    {/* Panel de envío de correo o lista de confirmados desde la pestaña Usuarios */}
+                    <div
+                      id="panel-envio-correo"
+                      className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <h2 className="text-xl font-bold">
+                            Enviar Correo o Lista de Confirmados por Clase
+                          </h2>
+                          <p className="mt-1 text-xs text-slate-400">
+                            Envía un mensaje por correo electrónico y campanita a un usuario específico, a todos los de un rol o al instructor de una clase con su listado de clientes confirmados.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setPanelCorreoAbierto((abierto) => !abierto)}
+                          className="rounded-xl bg-[#1268e8] px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-[#0d55b8]"
+                        >
+                          {panelCorreoAbierto ? 'Ocultar formulario' : 'Redactar correo'}
+                        </button>
+                      </div>
+
+                      {panelCorreoAbierto && (
+                        <form onSubmit={enviarCorreoNotificacion} className="mt-4 space-y-3">
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div>
+                              <label className="block text-xs font-bold text-slate-600">
+                                Tipo de destinatario
+                              </label>
+                              <select
+                                value={formCorreoAdmin.modoDestino}
+                                onChange={(e) =>
+                                  setFormCorreoAdmin({
+                                    ...formCorreoAdmin,
+                                    modoDestino: e.target.value,
+                                  })
+                                }
+                                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                              >
+                                <option value="instructor_clase">
+                                  Instructor de la clase seleccionada
+                                </option>
+                                <option value="usuario">
+                                  Usuario específico (cliente, coordinador o instructor)
+                                </option>
+                                <option value="rol">Todos los usuarios de un rol</option>
+                              </select>
+                            </div>
+
+                            {formCorreoAdmin.modoDestino === 'usuario' && (
+                              <div>
+                                <label className="block text-xs font-bold text-slate-600">
+                                  Usuario destinatario
+                                </label>
+                                <select
+                                  required
+                                  value={formCorreoAdmin.destinatarioId}
+                                  onChange={(e) =>
+                                    setFormCorreoAdmin({
+                                      ...formCorreoAdmin,
+                                      destinatarioId: e.target.value,
+                                    })
+                                  }
+                                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                                >
+                                  <option value="">Selecciona un usuario...</option>
+                                  {usuarios.map((u) => (
+                                    <option key={u._id} value={u._id}>
+                                      {nombreVisible(u)} ({u.correo} · {u.rol})
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            )}
+
+                            {formCorreoAdmin.modoDestino === 'rol' && (
+                              <div>
+                                <label className="block text-xs font-bold text-slate-600">
+                                  Rol destinatario
+                                </label>
+                                <select
+                                  value={formCorreoAdmin.rolDestino}
+                                  onChange={(e) =>
+                                    setFormCorreoAdmin({
+                                      ...formCorreoAdmin,
+                                      rolDestino: e.target.value,
+                                    })
+                                  }
+                                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                                >
+                                  <option value="instructor">Instructores</option>
+                                  <option value="coordinador">Coordinadores</option>
+                                  <option value="cliente">Clientes</option>
+                                  <option value="administrador">Administradores</option>
+                                  <option value="todos">Todos los usuarios activos</option>
+                                </select>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div>
+                              <label className="block text-xs font-bold text-slate-600">
+                                Adjuntar lista de confirmados de una clase (opcional)
+                              </label>
+                              <select
+                                value={formCorreoAdmin.claseId}
+                                onChange={(e) =>
+                                  setFormCorreoAdmin({
+                                    ...formCorreoAdmin,
+                                    claseId: e.target.value,
+                                  })
+                                }
+                                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                              >
+                                <option value="">
+                                  Sin adjuntar lista (solo mensaje personalizado)
+                                </option>
+                                {clases.map((c) => (
+                                  <option key={c._id} value={c._id}>
+                                    {c.nombre} ({c.recinto?.nombre || 'Recinto'} ·{' '}
+                                    {nombreVisible(c.instructor) || 'Instructor'})
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-bold text-slate-600">
+                                Filtrar lista por fecha (opcional)
+                              </label>
+                              <input
+                                type="date"
+                                value={formCorreoAdmin.fecha}
+                                onChange={(e) =>
+                                  setFormCorreoAdmin({
+                                    ...formCorreoAdmin,
+                                    fecha: e.target.value,
+                                  })
+                                }
+                                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold text-slate-600">
+                              Asunto del correo (opcional si adjuntas lista de clase)
+                            </label>
+                            <input
+                              type="text"
+                              value={formCorreoAdmin.asunto}
+                              onChange={(e) =>
+                                setFormCorreoAdmin({
+                                  ...formCorreoAdmin,
+                                  asunto: e.target.value,
+                                })
+                              }
+                              placeholder="Ej. Lista de confirmados / Aviso importante de administración"
+                              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold text-slate-600">
+                              Mensaje {formCorreoAdmin.claseId ? '(nota adicional opcional)' : '*'}
+                            </label>
+                            <textarea
+                              rows={3}
+                              value={formCorreoAdmin.mensaje}
+                              onChange={(e) =>
+                                setFormCorreoAdmin({
+                                  ...formCorreoAdmin,
+                                  mensaje: e.target.value,
+                                })
+                              }
+                              placeholder="Escribe el mensaje que se enviará por correo electrónico y a la campanita del usuario..."
+                              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                            />
+                          </div>
+
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            <button
+                              type="submit"
+                              disabled={accionEnCurso}
+                              className="primary-button !py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {accionEnCurso ? 'Enviando correo...' : 'Enviar correo ahora'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPanelCorreoAbierto(false)}
+                              className="secondary-button !py-2.5 text-sm"
+                            >
+                              Cerrar
+                            </button>
+                          </div>
+                        </form>
+                      )}
                     </div>
                   </div>
                 )}
@@ -2772,7 +3067,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
             {((usuario?.rol === 'coordinador' && vistaCoordinador === 'reservas') ||
               (usuario?.rol === 'administrador' && vistaAdmin === 'reservas')) && (
               <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <h2 className="text-xl font-bold">
                       Panel de Control de Reservas
@@ -2782,20 +3077,38 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                     </p>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex shrink-0 flex-wrap items-center gap-2.5">
                     <button
                       type="button"
                       onClick={descargarReporteCsv}
-                      className="rounded-xl bg-[#1268e8] px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-[#0d55b8]"
+                      className="rounded-xl bg-[#1268e8] px-3.5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-[#0d55b8]"
                     >
                       Descargar CSV
                     </button>
-                    <input
-                      type="date"
-                      value={filtroResFecha}
-                      onChange={(e) => setFiltroResFecha(e.target.value)}
-                      className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold"
-                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormCorreoAdmin((prev) => ({
+                          ...prev,
+                          claseId: filtroResClase || prev.claseId || clases[0]?._id || '',
+                          fecha: filtroResFecha || prev.fecha || '',
+                        }));
+                        setPanelCorreoAbierto((abierto) => !abierto);
+                      }}
+                      className="rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-2 text-xs font-bold text-[#1268e8] transition hover:bg-blue-100"
+                    >
+                      {panelCorreoAbierto ? 'Ocultar envío de correo' : 'Enviar lista por correo'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center gap-2.5 border-t border-slate-100 pt-4">
+                  <input
+                    type="date"
+                    value={filtroResFecha}
+                    onChange={(e) => setFiltroResFecha(e.target.value)}
+                    className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold"
+                  />
                     <select
                       value={filtroResRecinto}
                       onChange={(e) => setFiltroResRecinto(e.target.value)}
@@ -2869,8 +3182,190 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                       placeholder="Motivo opcional al cancelar..."
                       className="rounded-xl border border-slate-200 px-3 py-2 text-xs"
                     />
-                  </div>
                 </div>
+
+                {panelCorreoAbierto && (
+                  <form
+                    onSubmit={enviarCorreoNotificacion}
+                    className="mt-4 space-y-3 rounded-2xl border border-blue-200 bg-blue-50/40 p-4"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-sm font-bold text-[#1268e8]">
+                        Enviar lista de confirmados por clase o mensaje de correo
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setPanelCorreoAbierto(false)}
+                        className="text-xs font-semibold text-slate-500 hover:underline"
+                      >
+                        Cerrar
+                      </button>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600">
+                          Clase a reportar
+                        </label>
+                        <select
+                          value={formCorreoAdmin.claseId}
+                          onChange={(e) =>
+                            setFormCorreoAdmin({
+                              ...formCorreoAdmin,
+                              claseId: e.target.value,
+                            })
+                          }
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs"
+                        >
+                          <option value="">Solo mensaje personalizado</option>
+                          {clases.map((c) => (
+                            <option key={c._id} value={c._id}>
+                              {c.nombre} ({c.recinto?.nombre || 'Recinto'})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600">
+                          Fecha opcional
+                        </label>
+                        <input
+                          type="date"
+                          value={formCorreoAdmin.fecha}
+                          onChange={(e) =>
+                            setFormCorreoAdmin({
+                              ...formCorreoAdmin,
+                              fecha: e.target.value,
+                            })
+                          }
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600">
+                          Enviar a
+                        </label>
+                        <select
+                          value={formCorreoAdmin.modoDestino}
+                          onChange={(e) =>
+                            setFormCorreoAdmin({
+                              ...formCorreoAdmin,
+                              modoDestino: e.target.value,
+                            })
+                          }
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs"
+                        >
+                          <option value="instructor_clase">
+                            Instructor de la clase
+                          </option>
+                          <option value="rol">Todos los de un rol</option>
+                          {usuarios.length > 0 && (
+                            <option value="usuario">Usuario específico</option>
+                          )}
+                        </select>
+                      </div>
+
+                      {formCorreoAdmin.modoDestino === 'rol' && (
+                        <div>
+                          <label className="block text-xs font-bold text-slate-600">
+                            Rol destinatario
+                          </label>
+                          <select
+                            value={formCorreoAdmin.rolDestino}
+                            onChange={(e) =>
+                              setFormCorreoAdmin({
+                                ...formCorreoAdmin,
+                                rolDestino: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs"
+                          >
+                            <option value="instructor">Instructores</option>
+                            <option value="coordinador">Coordinadores</option>
+                            <option value="cliente">Clientes</option>
+                            <option value="administrador">Administradores</option>
+                            <option value="todos">Todos los usuarios</option>
+                          </select>
+                        </div>
+                      )}
+
+                      {formCorreoAdmin.modoDestino === 'usuario' && (
+                        <div>
+                          <label className="block text-xs font-bold text-slate-600">
+                            Usuario destinatario
+                          </label>
+                          <select
+                            required
+                            value={formCorreoAdmin.destinatarioId}
+                            onChange={(e) =>
+                              setFormCorreoAdmin({
+                                ...formCorreoAdmin,
+                                destinatarioId: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs"
+                          >
+                            <option value="">Selecciona usuario...</option>
+                            {usuarios.map((u) => (
+                              <option key={u._id} value={u._id}>
+                                {nombreVisible(u)} ({u.rol})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600">
+                          Asunto (opcional si eliges clase)
+                        </label>
+                        <input
+                          type="text"
+                          value={formCorreoAdmin.asunto}
+                          onChange={(e) =>
+                            setFormCorreoAdmin({
+                              ...formCorreoAdmin,
+                              asunto: e.target.value,
+                            })
+                          }
+                          placeholder="Ej. Lista de confirmados de tu clase"
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-bold text-slate-600">
+                          Nota o mensaje {formCorreoAdmin.claseId ? '(opcional)' : '*'}
+                        </label>
+                        <div className="mt-1 flex gap-2">
+                          <input
+                            type="text"
+                            value={formCorreoAdmin.mensaje}
+                            onChange={(e) =>
+                              setFormCorreoAdmin({
+                                ...formCorreoAdmin,
+                                mensaje: e.target.value,
+                              })
+                            }
+                            placeholder="Escribe una nota opcional o el cuerpo del correo..."
+                            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs"
+                          />
+                          <button
+                            type="submit"
+                            disabled={accionEnCurso}
+                            className="primary-button shrink-0 !py-2 text-xs disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {accionEnCurso ? 'Enviando...' : 'Enviar correo'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </form>
+                )}
 
                 {/* Formulario en línea para Reasignación exclusiva de Administrador */}
                 {usuario?.rol === 'administrador' && formReasignar.reservaId && (
@@ -3346,7 +3841,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                           {todasSugerenciasPaginadas.registros.map((s) => (
                             <tr key={s._id}>
                               <td className="py-3 pr-4 font-semibold">
-                                {nombreMostradoUsuario(s.usuario, 'Cliente')}
+                                {nombreVisible(s.usuario) || 'Cliente'}
                               </td>
                               <td className="py-3 pr-4">
                                 <span className="font-bold">
