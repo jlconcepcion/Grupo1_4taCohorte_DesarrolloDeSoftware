@@ -318,7 +318,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
     preferenciasRecordatorioIniciales
   );
 
-  // Estado para formulario de Recintos (HU04 / HU05 - Administrador)
+  // Estado para formulario de Recintos (Administrador)
   const [formRecinto, setFormRecinto] = useState({
     id: null,
     nombre: '',
@@ -327,7 +327,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
     descripcion: '',
   });
 
-  // Estado para formulario de Usuarios (HU03 - Administrador)
+  // Estado para formulario de Usuarios (Administrador)
   const [formUsuario, setFormUsuario] = useState({
     correo: '',
     nombreUsuario: '',
@@ -337,7 +337,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
     preferenciasRecordatorio: preferenciasRecordatorioIniciales(),
   });
 
-  // Estado para formulario de Clases (HU06 - Instructor)
+  // Estado para formulario de Clases (Instructor)
   const [formClase, setFormClase] = useState({
     id: null,
     nombre: '',
@@ -345,7 +345,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
     recinto: '',
   });
 
-  // Estado para formulario de Bloques (HU07 / HU08 / HU09 - Instructor / Coordinador / Admin)
+  // Estado para formulario de Bloques (Instructor / Coordinador / Admin)
   const [formBloque, setFormBloque] = useState({
     id: null,
     clase: '',
@@ -362,7 +362,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
   const [filtroRecinto, setFiltroRecinto] = useState('');
   const [filtroDia, setFiltroDia] = useState('');
 
-  // Filtros de Disponibilidad y Mis Reservas para el Cliente (HU10, HU11, HU13)
+  // Filtros de Disponibilidad y Mis Reservas para el Cliente
   const [vistaCliente, setVistaCliente] = useState('disponibilidad');
   const [filtroDispFecha, setFiltroDispFecha] = useState('');
   const [filtroDispRecinto, setFiltroDispRecinto] = useState('');
@@ -370,7 +370,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
   const [filtroDispInstructor, setFiltroDispInstructor] = useState('');
   const [filtroTipoMisReservas, setFiltroTipoMisReservas] = useState('todas');
 
-  // Filtros del Panel de Reservas para Coordinador y Administrador (HU15 - HU17, ST03.07)
+  // Filtros del Panel de Reservas para Coordinador y Administrador
   const [filtroResFecha, setFiltroResFecha] = useState('');
   const [filtroResRecinto, setFiltroResRecinto] = useState('');
   const [filtroResClase, setFiltroResClase] = useState('');
@@ -380,7 +380,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
   const [conteosExpandidos, setConteosExpandidos] = useState({});
   const [motivoCancelacionCoord, setMotivoCancelacionCoord] = useState('');
 
-  // Formulario de Reasignación de Reserva exclusiva del Administrador (ST03.10)
+  // Formulario de Reasignación de Reserva exclusiva del Administrador
   const [formReasignar, setFormReasignar] = useState({
     reservaId: null,
     nuevoBloqueId: '',
@@ -388,7 +388,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
     nuevoClienteId: '',
   });
 
-  // Estado y filtros de Épica 5 · Sugerencias e Indicadores (ST05.02 - ST05.06)
+  // Estado y filtros de Sugerencias e Indicadores
   const [formSugerencia, setFormSugerencia] = useState({
     recinto: '',
     clase: '',
@@ -402,6 +402,18 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
   const [filtroIndHasta, setFiltroIndHasta] = useState('');
   const [paginaMisSugerencias, setPaginaMisSugerencias] = useState(1);
   const [paginaTodasSugerencias, setPaginaTodasSugerencias] = useState(1);
+
+  // Estado para envío manual de correos y lista de confirmados por clase (Admin y Coordinador)
+  const [panelCorreoAbierto, setPanelCorreoAbierto] = useState(false);
+  const [formCorreoAdmin, setFormCorreoAdmin] = useState({
+    modoDestino: 'instructor_clase',
+    destinatarioId: '',
+    rolDestino: 'instructor',
+    claseId: '',
+    fecha: '',
+    asunto: '',
+    mensaje: '',
+  });
 
   // Navegación y paginación
   const [vistaAdmin, setVistaAdmin] = useState('recintos');
@@ -754,7 +766,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
   const todasSugerenciasPaginadas = paginar(todasSugerencias, paginaTodasSugerencias);
 
   // ===========================================================================
-  // Acciones Administrador: Recintos (HU04, HU05, ST02.03) y Usuarios (HU03)
+  // Acciones Administrador: Recintos y Usuarios
   // ===========================================================================
   async function guardarRecinto(e) {
     e.preventDefault();
@@ -822,7 +834,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
   }
 
   // ===========================================================================
-  // Acciones Instructor: Clases (HU06) y Bloques Propios (HU07, HU08, ST02.08)
+  // Acciones Instructor: Clases y Bloques Propios
   // ===========================================================================
   async function guardarClase(e) {
     e.preventDefault();
@@ -923,7 +935,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
   }
 
   // ===========================================================================
-  // Acciones Sprint 3 · Reservas (Cliente: HU11, HU12, HU14 · Coord/Admin: HU16, HU17, ST03.10)
+  // Acciones de Reservas (Cliente, Coordinador y Administrador)
   // ===========================================================================
   async function reservarCupoCliente(itemDisp) {
     limpiarAvisos();
@@ -1027,7 +1039,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
   }
 
   // ===========================================================================
-  // Acciones Sprint 4 · Épica 5: Quejas, Sugerencias e Indicadores (ST05.02 - ST05.06)
+  // Acciones de Quejas, Sugerencias e Indicadores
   // ===========================================================================
   async function enviarSugerenciaCliente(e) {
     e.preventDefault();
@@ -1064,6 +1076,80 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
       await cargarDatos();
     } catch (err) {
       setMensajeError(mensajeErrorAccion(err, 'No se pudo actualizar la sugerencia'));
+    } finally {
+      setAccionEnCurso(false);
+    }
+  }
+
+  function prepararCorreoParaUsuario(usuarioDestino) {
+    if (!usuarioDestino) return;
+    limpiarAvisos();
+    setFormCorreoAdmin((prev) => ({
+      ...prev,
+      modoDestino: 'usuario',
+      destinatarioId: usuarioDestino._id || '',
+    }));
+    setPanelCorreoAbierto(true);
+    window.setTimeout(() => {
+      document
+        .getElementById('panel-envio-correo')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 80);
+  }
+
+  async function enviarCorreoNotificacion(e) {
+    e.preventDefault();
+    limpiarAvisos();
+
+    if (formCorreoAdmin.modoDestino === 'instructor_clase' && !formCorreoAdmin.claseId) {
+      setMensajeError('Selecciona una clase para enviar la lista de confirmados a su instructor.');
+      return;
+    }
+    if (formCorreoAdmin.modoDestino === 'usuario' && !formCorreoAdmin.destinatarioId) {
+      setMensajeError('Selecciona un usuario destinatario.');
+      return;
+    }
+    if (!formCorreoAdmin.claseId && !formCorreoAdmin.mensaje.trim()) {
+      setMensajeError('Escribe un mensaje o selecciona una clase para enviar su lista de confirmados.');
+      return;
+    }
+
+    setAccionEnCurso(true);
+    try {
+      const payload = {
+        asunto: formCorreoAdmin.asunto.trim(),
+        mensaje: formCorreoAdmin.mensaje.trim(),
+        claseId: formCorreoAdmin.claseId || '',
+        fecha: formCorreoAdmin.fecha || '',
+      };
+
+      if (formCorreoAdmin.modoDestino === 'usuario') {
+        payload.destinatarioId = formCorreoAdmin.destinatarioId;
+      } else if (formCorreoAdmin.modoDestino === 'rol') {
+        payload.rolDestino = formCorreoAdmin.rolDestino;
+      } else {
+        payload.destinatarioId = 'instructor_clase';
+      }
+
+      const resp = await notificacionesApi.enviarMensaje(payload);
+      const detalleClase = resp?.resumenClase
+        ? ` · Clase: ${resp.resumenClase.clase} (${resp.resumenClase.totales?.confirmadas || 0} confirmados, ${resp.resumenClase.totales?.pendientes || 0} pendientes)`
+        : '';
+      const correosEnviados = Array.isArray(resp?.resultados)
+        ? resp.resultados.map((r) => r.correo).join(', ')
+        : '';
+
+      setMensajeExito(
+        `Correo enviado exitosamente a ${correosEnviados || `${resp?.totalDestinatarios || 1} destinatario(s)`}${detalleClase}.`
+      );
+      setFormCorreoAdmin((prev) => ({
+        ...prev,
+        asunto: '',
+        mensaje: '',
+      }));
+      await cargarNotificacionesNavegacion();
+    } catch (err) {
+      setMensajeError(mensajeErrorAccion(err, 'No se pudo enviar el correo'));
     } finally {
       setAccionEnCurso(false);
     }
@@ -1381,7 +1467,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
         ) : (
           <div className="mt-8 space-y-10">
             {/* ===============================================================
-                VISTA CLIENTE: Disponibilidad, Reserva y Mis Reservas (HU10-HU14)
+                VISTA CLIENTE: Disponibilidad, Reserva y Mis Reservas
             =============================================================== */}
             {usuario?.rol === 'cliente' && (
               <div className="space-y-6">
@@ -1426,7 +1512,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                     <div className="flex flex-wrap items-center justify-between gap-4">
                       <div>
                         <h2 className="text-xl font-bold">
-                          Horarios Disponibles con Cupos Libres (HU10 · HU11)
+                          Horarios Disponibles con Cupos Libres
                         </h2>
                         <p className="mt-1 text-xs text-slate-400">
                           Filtra por fecha, recinto activo, clase o instructor y solicita tu cupo en línea.
@@ -1564,7 +1650,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                     <div className="flex flex-wrap items-center justify-between gap-4">
                       <div>
                         <h2 className="text-xl font-bold">
-                          Mis Reservas (HU12 · HU13 · HU14)
+                          Mis Reservas
                         </h2>
                         <p className="mt-1 text-xs text-slate-400">
                           Confirma tu asistencia hasta 1 hora antes del inicio o cancela para liberar tu cupo.
@@ -1672,10 +1758,10 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
 
                 {vistaCliente === 'sugerencias' && (
                   <div className="grid gap-6 lg:grid-cols-2">
-                    {/* Formulario de envío de Quejas y Sugerencias (ST05.02) */}
+                    {/* Formulario de envío de Quejas y Sugerencias */}
                     <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
                       <h2 className="text-xl font-bold">
-                        Buzón de Quejas y Sugerencias (ST05.02)
+                        Buzón de Quejas y Sugerencias
                       </h2>
                       <p className="mt-1 text-xs text-slate-400">
                         Cuéntanos tu experiencia sobre un recinto o clase (máximo 500 caracteres).
@@ -1890,10 +1976,10 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
 
                 {vistaAdmin === 'recintos' && (
                   <div className="space-y-6">
-                    {/* Gestión de Recintos (ST02.03) */}
+                    {/* Gestión de Recintos */}
                     <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
                       <h2 className="text-xl font-bold">
-                        {formRecinto.id ? 'Editar Recinto (HU05)' : 'Crear Nuevo Recinto (HU04)'}
+                        {formRecinto.id ? 'Editar Recinto' : 'Crear Nuevo Recinto'}
                       </h2>
                       <p className="mt-1 text-xs text-slate-400">
                         Desactivar un recinto lo oculta para nuevas reservas conservando su historial.
@@ -2045,10 +2131,10 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
 
                 {vistaAdmin === 'usuarios' && (
                   <div className="space-y-6">
-                    {/* Creación de Usuarios e Instructores (HU03 / ST01.07) */}
+                    {/* Creación de Usuarios e Instructores */}
                     <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
                         <h2 className="text-xl font-bold">
-                          Crear Usuario (HU03)
+                          Crear Usuario
                         </h2>
                         <p className="mt-1 text-xs text-slate-400">
                           Selecciona Cliente para que la cuenta pueda reservar. El rol instructor coordina horarios y no reserva cupos.
@@ -2189,6 +2275,13 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                               >
                                 Preferencias
                               </button>
+                              <button
+                                type="button"
+                                onClick={() => prepararCorreoParaUsuario(u)}
+                                className="rounded-lg border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-bold text-[#1268e8] hover:bg-blue-100"
+                              >
+                                Enviar correo
+                              </button>
                             </div>
                           </div>
                         ))}
@@ -2202,13 +2295,215 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                         onCambiar={setPaginaUsuarios}
                       />
                     </div>
+
+                    {/* Panel de envío de correo o lista de confirmados desde la pestaña Usuarios */}
+                    <div
+                      id="panel-envio-correo"
+                      className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <h2 className="text-xl font-bold">
+                            Enviar Correo o Lista de Confirmados por Clase
+                          </h2>
+                          <p className="mt-1 text-xs text-slate-400">
+                            Envía un mensaje por correo electrónico y campanita a un usuario específico, a todos los de un rol o al instructor de una clase con su listado de clientes confirmados.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setPanelCorreoAbierto((abierto) => !abierto)}
+                          className="rounded-xl bg-[#1268e8] px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-[#0d55b8]"
+                        >
+                          {panelCorreoAbierto ? 'Ocultar formulario' : 'Redactar correo'}
+                        </button>
+                      </div>
+
+                      {panelCorreoAbierto && (
+                        <form onSubmit={enviarCorreoNotificacion} className="mt-4 space-y-3">
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div>
+                              <label className="block text-xs font-bold text-slate-600">
+                                Tipo de destinatario
+                              </label>
+                              <select
+                                value={formCorreoAdmin.modoDestino}
+                                onChange={(e) =>
+                                  setFormCorreoAdmin({
+                                    ...formCorreoAdmin,
+                                    modoDestino: e.target.value,
+                                  })
+                                }
+                                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                              >
+                                <option value="instructor_clase">
+                                  Instructor de la clase seleccionada
+                                </option>
+                                <option value="usuario">
+                                  Usuario específico (cliente, coordinador o instructor)
+                                </option>
+                                <option value="rol">Todos los usuarios de un rol</option>
+                              </select>
+                            </div>
+
+                            {formCorreoAdmin.modoDestino === 'usuario' && (
+                              <div>
+                                <label className="block text-xs font-bold text-slate-600">
+                                  Usuario destinatario
+                                </label>
+                                <select
+                                  required
+                                  value={formCorreoAdmin.destinatarioId}
+                                  onChange={(e) =>
+                                    setFormCorreoAdmin({
+                                      ...formCorreoAdmin,
+                                      destinatarioId: e.target.value,
+                                    })
+                                  }
+                                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                                >
+                                  <option value="">Selecciona un usuario...</option>
+                                  {usuarios.map((u) => (
+                                    <option key={u._id} value={u._id}>
+                                      {nombreVisible(u)} ({u.correo} · {u.rol})
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            )}
+
+                            {formCorreoAdmin.modoDestino === 'rol' && (
+                              <div>
+                                <label className="block text-xs font-bold text-slate-600">
+                                  Rol destinatario
+                                </label>
+                                <select
+                                  value={formCorreoAdmin.rolDestino}
+                                  onChange={(e) =>
+                                    setFormCorreoAdmin({
+                                      ...formCorreoAdmin,
+                                      rolDestino: e.target.value,
+                                    })
+                                  }
+                                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                                >
+                                  <option value="instructor">Instructores</option>
+                                  <option value="coordinador">Coordinadores</option>
+                                  <option value="cliente">Clientes</option>
+                                  <option value="administrador">Administradores</option>
+                                  <option value="todos">Todos los usuarios activos</option>
+                                </select>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div>
+                              <label className="block text-xs font-bold text-slate-600">
+                                Adjuntar lista de confirmados de una clase (opcional)
+                              </label>
+                              <select
+                                value={formCorreoAdmin.claseId}
+                                onChange={(e) =>
+                                  setFormCorreoAdmin({
+                                    ...formCorreoAdmin,
+                                    claseId: e.target.value,
+                                  })
+                                }
+                                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                              >
+                                <option value="">
+                                  Sin adjuntar lista (solo mensaje personalizado)
+                                </option>
+                                {clases.map((c) => (
+                                  <option key={c._id} value={c._id}>
+                                    {c.nombre} ({c.recinto?.nombre || 'Recinto'} ·{' '}
+                                    {nombreVisible(c.instructor) || 'Instructor'})
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-bold text-slate-600">
+                                Filtrar lista por fecha (opcional)
+                              </label>
+                              <input
+                                type="date"
+                                value={formCorreoAdmin.fecha}
+                                onChange={(e) =>
+                                  setFormCorreoAdmin({
+                                    ...formCorreoAdmin,
+                                    fecha: e.target.value,
+                                  })
+                                }
+                                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold text-slate-600">
+                              Asunto del correo (opcional si adjuntas lista de clase)
+                            </label>
+                            <input
+                              type="text"
+                              value={formCorreoAdmin.asunto}
+                              onChange={(e) =>
+                                setFormCorreoAdmin({
+                                  ...formCorreoAdmin,
+                                  asunto: e.target.value,
+                                })
+                              }
+                              placeholder="Ej. Lista de confirmados / Aviso importante de administración"
+                              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold text-slate-600">
+                              Mensaje {formCorreoAdmin.claseId ? '(nota adicional opcional)' : '*'}
+                            </label>
+                            <textarea
+                              rows={3}
+                              value={formCorreoAdmin.mensaje}
+                              onChange={(e) =>
+                                setFormCorreoAdmin({
+                                  ...formCorreoAdmin,
+                                  mensaje: e.target.value,
+                                })
+                              }
+                              placeholder="Escribe el mensaje que se enviará por correo electrónico y a la campanita del usuario..."
+                              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                            />
+                          </div>
+
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            <button
+                              type="submit"
+                              disabled={accionEnCurso}
+                              className="primary-button !py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {accionEnCurso ? 'Enviando correo...' : 'Enviar correo ahora'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPanelCorreoAbierto(false)}
+                              className="secondary-button !py-2.5 text-sm"
+                            >
+                              Cerrar
+                            </button>
+                          </div>
+                        </form>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
             )}
 
             {/* ===============================================================
-                VISTA INSTRUCTOR: Clases (HU06), Bloques (HU07/HU08) y Conteo (ST03.09)
+                VISTA INSTRUCTOR: Clases, Bloques y Conteo
             =============================================================== */}
             {usuario?.rol === 'instructor' && (
               <div className="space-y-6">
@@ -2257,7 +2552,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                     {formularioClaseAbierto && (
                     <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
                       <h2 className="text-xl font-bold">
-                        {formClase.id ? 'Editar Mi Clase (HU06)' : 'Crear Nueva Clase (HU06)'}
+                        {formClase.id ? 'Editar Mi Clase' : 'Crear Nueva Clase'}
                       </h2>
                       <p className="mt-1 text-xs text-slate-400">
                         Solo se pueden asociar clases a recintos activos.
@@ -2334,7 +2629,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                     )}
 
                     <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
-                      <h2 className="text-xl font-bold">Mis Clases (HU06)</h2>
+                      <h2 className="text-xl font-bold">Mis Clases</h2>
                       <p className="mt-1 text-xs text-slate-400">
                         Tus clases publicadas, de 5 en 5.
                       </p>
@@ -2413,8 +2708,8 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                     <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
                       <h2 className="text-xl font-bold">
                         {formBloque.id
-                          ? 'Actualizar Bloque de Horario (HU08)'
-                          : 'Publicar Bloque de Disponibilidad (HU07)'}
+                          ? 'Actualizar Bloque de Horario'
+                          : 'Publicar Bloque de Disponibilidad'}
                       </h2>
                       <p className="mt-1 text-xs text-slate-400">
                         Valida automáticamente que la hora fin sea posterior al inicio y que no haya solapamientos.
@@ -2563,7 +2858,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                     )}
 
                     <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
-                      <h2 className="text-xl font-bold">Mis Bloques (HU07 / HU08)</h2>
+                      <h2 className="text-xl font-bold">Mis Bloques</h2>
                       <p className="mt-1 text-xs text-slate-400">
                         Solo se muestran bloques con una próxima sesión pendiente.
                       </p>
@@ -2617,7 +2912,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                 {vistaInstructor === 'conteo' && (
                   <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
                     <h2 className="text-xl font-bold">
-                      Conteo de Reservas y Confirmaciones por Clase y Horario (ST03.09)
+                      Conteo de Reservas y Confirmaciones por Clase y Horario
                     </h2>
                     <p className="mt-1 text-xs text-slate-400">
                       Toca una tarjeta para ver los clientes por estado. Puedes filtrar por fechas pasadas para revisar clases ya realizadas.
@@ -2768,35 +3063,52 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
 
             {/* ===============================================================
                 PANEL DE CONTROL DE RESERVAS PARA COORDINADOR Y ADMIN
-                (HU15, HU16, HU17, ST03.07, ST03.08, ST03.10)
             =============================================================== */}
             {((usuario?.rol === 'coordinador' && vistaCoordinador === 'reservas') ||
               (usuario?.rol === 'administrador' && vistaAdmin === 'reservas')) && (
               <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <h2 className="text-xl font-bold">
-                      Panel de Control de Reservas (HU15 · HU16 · HU17)
+                      Panel de Control de Reservas
                     </h2>
                     <p className="mt-1 text-xs text-slate-400">
                       Filtra por fecha, recinto, clase, instructor o estado para confirmar asistencias o cancelar reservas no confirmadas y liberar cupos.
                     </p>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex shrink-0 flex-wrap items-center gap-2.5">
                     <button
                       type="button"
                       onClick={descargarReporteCsv}
-                      className="rounded-xl bg-[#1268e8] px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-[#0d55b8]"
+                      className="rounded-xl bg-[#1268e8] px-3.5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-[#0d55b8]"
                     >
                       Descargar CSV
                     </button>
-                    <input
-                      type="date"
-                      value={filtroResFecha}
-                      onChange={(e) => setFiltroResFecha(e.target.value)}
-                      className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold"
-                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormCorreoAdmin((prev) => ({
+                          ...prev,
+                          claseId: filtroResClase || prev.claseId || clases[0]?._id || '',
+                          fecha: filtroResFecha || prev.fecha || '',
+                        }));
+                        setPanelCorreoAbierto((abierto) => !abierto);
+                      }}
+                      className="rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-2 text-xs font-bold text-[#1268e8] transition hover:bg-blue-100"
+                    >
+                      {panelCorreoAbierto ? 'Ocultar envío de correo' : 'Enviar lista por correo'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center gap-2.5 border-t border-slate-100 pt-4">
+                  <input
+                    type="date"
+                    value={filtroResFecha}
+                    onChange={(e) => setFiltroResFecha(e.target.value)}
+                    className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold"
+                  />
                     <select
                       value={filtroResRecinto}
                       onChange={(e) => setFiltroResRecinto(e.target.value)}
@@ -2870,10 +3182,192 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                       placeholder="Motivo opcional al cancelar..."
                       className="rounded-xl border border-slate-200 px-3 py-2 text-xs"
                     />
-                  </div>
                 </div>
 
-                {/* Formulario en línea para Reasignación exclusiva de Administrador (ST03.10) */}
+                {panelCorreoAbierto && (
+                  <form
+                    onSubmit={enviarCorreoNotificacion}
+                    className="mt-4 space-y-3 rounded-2xl border border-blue-200 bg-blue-50/40 p-4"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-sm font-bold text-[#1268e8]">
+                        Enviar lista de confirmados por clase o mensaje de correo
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setPanelCorreoAbierto(false)}
+                        className="text-xs font-semibold text-slate-500 hover:underline"
+                      >
+                        Cerrar
+                      </button>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600">
+                          Clase a reportar
+                        </label>
+                        <select
+                          value={formCorreoAdmin.claseId}
+                          onChange={(e) =>
+                            setFormCorreoAdmin({
+                              ...formCorreoAdmin,
+                              claseId: e.target.value,
+                            })
+                          }
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs"
+                        >
+                          <option value="">Solo mensaje personalizado</option>
+                          {clases.map((c) => (
+                            <option key={c._id} value={c._id}>
+                              {c.nombre} ({c.recinto?.nombre || 'Recinto'})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600">
+                          Fecha opcional
+                        </label>
+                        <input
+                          type="date"
+                          value={formCorreoAdmin.fecha}
+                          onChange={(e) =>
+                            setFormCorreoAdmin({
+                              ...formCorreoAdmin,
+                              fecha: e.target.value,
+                            })
+                          }
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600">
+                          Enviar a
+                        </label>
+                        <select
+                          value={formCorreoAdmin.modoDestino}
+                          onChange={(e) =>
+                            setFormCorreoAdmin({
+                              ...formCorreoAdmin,
+                              modoDestino: e.target.value,
+                            })
+                          }
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs"
+                        >
+                          <option value="instructor_clase">
+                            Instructor de la clase
+                          </option>
+                          <option value="rol">Todos los de un rol</option>
+                          {usuarios.length > 0 && (
+                            <option value="usuario">Usuario específico</option>
+                          )}
+                        </select>
+                      </div>
+
+                      {formCorreoAdmin.modoDestino === 'rol' && (
+                        <div>
+                          <label className="block text-xs font-bold text-slate-600">
+                            Rol destinatario
+                          </label>
+                          <select
+                            value={formCorreoAdmin.rolDestino}
+                            onChange={(e) =>
+                              setFormCorreoAdmin({
+                                ...formCorreoAdmin,
+                                rolDestino: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs"
+                          >
+                            <option value="instructor">Instructores</option>
+                            <option value="coordinador">Coordinadores</option>
+                            <option value="cliente">Clientes</option>
+                            <option value="administrador">Administradores</option>
+                            <option value="todos">Todos los usuarios</option>
+                          </select>
+                        </div>
+                      )}
+
+                      {formCorreoAdmin.modoDestino === 'usuario' && (
+                        <div>
+                          <label className="block text-xs font-bold text-slate-600">
+                            Usuario destinatario
+                          </label>
+                          <select
+                            required
+                            value={formCorreoAdmin.destinatarioId}
+                            onChange={(e) =>
+                              setFormCorreoAdmin({
+                                ...formCorreoAdmin,
+                                destinatarioId: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs"
+                          >
+                            <option value="">Selecciona usuario...</option>
+                            {usuarios.map((u) => (
+                              <option key={u._id} value={u._id}>
+                                {nombreVisible(u)} ({u.rol})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600">
+                          Asunto (opcional si eliges clase)
+                        </label>
+                        <input
+                          type="text"
+                          value={formCorreoAdmin.asunto}
+                          onChange={(e) =>
+                            setFormCorreoAdmin({
+                              ...formCorreoAdmin,
+                              asunto: e.target.value,
+                            })
+                          }
+                          placeholder="Ej. Lista de confirmados de tu clase"
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-bold text-slate-600">
+                          Nota o mensaje {formCorreoAdmin.claseId ? '(opcional)' : '*'}
+                        </label>
+                        <div className="mt-1 flex gap-2">
+                          <input
+                            type="text"
+                            value={formCorreoAdmin.mensaje}
+                            onChange={(e) =>
+                              setFormCorreoAdmin({
+                                ...formCorreoAdmin,
+                                mensaje: e.target.value,
+                              })
+                            }
+                            placeholder="Escribe una nota opcional o el cuerpo del correo..."
+                            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs"
+                          />
+                          <button
+                            type="submit"
+                            disabled={accionEnCurso}
+                            className="primary-button shrink-0 !py-2 text-xs disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {accionEnCurso ? 'Enviando...' : 'Enviar correo'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </form>
+                )}
+
+                {/* Formulario en línea para Reasignación exclusiva de Administrador */}
                 {usuario?.rol === 'administrador' && formReasignar.reservaId && (
                   <form
                     id="panel-reasignacion"
@@ -2881,7 +3375,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                     className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-blue-200 bg-blue-50/50 p-4"
                   >
                     <span className="text-xs font-bold text-[#1268e8]">
-                      Reasignar reserva (ST03.10):
+                      Reasignar reserva:
                     </span>
                     <select
                       required
@@ -3070,19 +3564,18 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
             )}
 
             {/* ===============================================================
-                ÉPICA 5 · PANEL DE SUGERENCIAS E INDICADORES DE DESEMPEÑO
-                (Coordinador: ST05.04 · Administrador: ST05.05 y ST05.06)
+                PANEL DE SUGERENCIAS E INDICADORES DE DESEMPEÑO
             =============================================================== */}
             {((usuario?.rol === 'coordinador' && vistaCoordinador === 'sugerencias') ||
               (usuario?.rol === 'administrador' && vistaAdmin === 'sugerencias')) && (
               <div className="space-y-6">
-                {/* Panel de Indicadores exclusivo del Administrador (ST05.05 y ST05.06) */}
+                {/* Panel de Indicadores exclusivo del Administrador */}
                 {usuario?.rol === 'administrador' && indicadoresSugerencias && (
                   <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
                     <div className="flex flex-wrap items-center justify-between gap-4">
                       <div>
                         <h2 className="text-xl font-bold">
-                          Indicadores de Desempeño basados en Sugerencias (ST05.05 · ST05.06)
+                          Indicadores de Desempeño basados en Sugerencias
                         </h2>
                         <p className="mt-1 text-xs text-slate-400">
                           Conteo de quejas y sugerencias por recinto, clase y categoría en el periodo seleccionado.
@@ -3159,7 +3652,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                       </div>
                     </div>
 
-                    {/* Gráficos simples de barras y tablas por Recinto, Clase y Categoría (ST05.06) */}
+                    {/* Gráficos simples de barras y tablas por Recinto, Clase y Categoría */}
                     <div className="mt-6 grid gap-6 lg:grid-cols-3">
                       <div className="rounded-2xl border border-slate-100 p-4">
                         <h3 className="text-sm font-bold">Por Recinto</h3>
@@ -3262,12 +3755,12 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                   </div>
                 )}
 
-                {/* Listado de Quejas y Sugerencias para Coordinador y Administrador (ST05.04) */}
+                {/* Listado de Quejas y Sugerencias para Coordinador y Administrador */}
                 <div className="rounded-[22px] border border-slate-200 bg-white p-6 shadow-sm">
                   <div className="flex flex-wrap items-center justify-between gap-4">
                     <div>
                       <h2 className="text-xl font-bold">
-                        Buzón de Quejas y Sugerencias de Clientes (ST05.04)
+                        Buzón de Quejas y Sugerencias de Clientes
                       </h2>
                       <p className="mt-1 text-xs text-slate-400">
                         Filtra por recinto, categoría o estado y marca cada sugerencia como revisada.
@@ -3348,7 +3841,7 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                           {todasSugerenciasPaginadas.registros.map((s) => (
                             <tr key={s._id}>
                               <td className="py-3 pr-4 font-semibold">
-                                {nombreMostradoUsuario(s.usuario, 'Cliente')}
+                                {nombreVisible(s.usuario) || 'Cliente'}
                               </td>
                               <td className="py-3 pr-4">
                                 <span className="font-bold">
@@ -3417,14 +3910,14 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
             )}
 
             {/* ===============================================================
-                VISTA COORDINADOR / ADMIN: Edición de bloques (HU09, ST02.09)
+                VISTA COORDINADOR / ADMIN: Edición de bloques
             =============================================================== */}
             {((usuario?.rol === 'coordinador' && vistaCoordinador === 'horarios') ||
               usuario?.rol === 'administrador') &&
               formBloque.id && (
                 <div className="rounded-[22px] border border-blue-200 bg-white p-6 shadow-sm">
                   <h2 className="text-lg font-bold">
-                    Edición Operativa de Bloque de Horario (HU09 · Auditoría Activa)
+                    Edición Operativa de Bloque de Horario (Auditoría Activa)
                   </h2>
                   <form onSubmit={guardarBloque} className="mt-4 grid gap-3 sm:grid-cols-5">
                     <select
@@ -3496,8 +3989,8 @@ export default function Dashboard({ usuario, onSalir, onActualizarUsuario }) {
                 <div>
                   <h2 className="text-xl font-bold">
                     {usuario?.rol === 'cliente'
-                      ? 'Catálogo General de Recintos y Horarios (ST02.10)'
-                      : 'Horarios y Bloques de Disponibilidad por Recinto (HU07–HU09)'}
+                      ? 'Catálogo General de Recintos y Horarios'
+                      : 'Horarios y Bloques de Disponibilidad por Recinto'}
                   </h2>
                   <p className="mt-1 text-xs text-slate-400">
                     Filtra por recinto o día de la semana para consultar la programación vigente.

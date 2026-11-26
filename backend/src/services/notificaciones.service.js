@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const Reserva = require('../models/Reserva');
 const Notificacion = require('../models/Notificacion');
 const BloqueDisponibilidad = require('../models/BloqueDisponibilidad');
+const Clase = require('../models/Clase');
 const {
   normalizarPreferenciasRecordatorio,
   preferenciasRecordatorioPorDefecto,
@@ -601,6 +602,237 @@ function huellaToken(token) {
   return crypto.createHash('sha256').update(String(token)).digest('hex');
 }
 
+async function construirListaConfirmadosPorClase({ claseId, fecha = '' }) {
+  if (!claseId) return null;
+  let consultaClase = Clase.findById(claseId);
+  if (consultaClase && typeof consultaClase.populate === 'function') {
+    consultaClase = consultaClase
+      .populate('recinto', 'nombre tipo')
+      .populate('instructor', 'correo nombreUsuario rol telefono');
+  }
+  const clase = await consultaClase;
+  if (!clase) return null;
+
+  const filtro = {
+    clase: clase._id || claseId,
+    estado: { $in: ['pendiente', 'confirmada', 'cancelada'] },
+  };
+  if (fecha && String(fecha).trim()) {
+    filtro.fecha = String(fecha).trim();
+  }
+
+  let consultaReservas = Reserva.find(filtro);
+  if (consultaReservas && typeof consultaReservas.populate === 'function') {
+    consultaReservas = consultaReservas
+      .populate('cliente', 'correo nombreUsuario telefono')
+      .populate('bloque', 'diaSemana horaInicio horaFin');
+  }
+  const listaReservas = await consultaReservas;
+  const reservas = Array.isArray(listaReservas) ? [...listaReservas] : [];
+
+  reservas.sort((a, b) => {
+    const cmpFecha = String(a.fecha || '').localeCompare(String(b.fecha || ''));
+    if (cmpFecha !== 0) return cmpFecha;
+    return String(a.bloque?.horaInicio || '').localeCompare(String(b.bloque?.horaInicio || ''));
+  });
+
+  const formatearAsistente = (r) => {
+    const cli = r.cliente && typeof r.cliente === 'object' ? r.cliente : {};
+    const nombre = String(cli.nombreUsuario || '').trim();
+    const correo = cli.correo || 'Sin correo';
+    const horario =
+      r.bloque?.horaInicio && r.bloque?.horaFin
+        ? `${r.bloque.horaInicio} - ${r.bloque.horaFin}`
+        : 'Horario asignado';
+    return {
+      reservaId: r._id,
+      nombre,
+      correo,
+      etiqueta: nombre ? `${nombre} (${correo})` : correo,
+      fecha: r.fecha || '',
+      horario,
+      estado: r.estado,
+    };
+  };
+
+  const confirmadas = reservas
+    .filter((r) => r.estado === 'confirmada')
+    .map(formatearAsistente);
+  const pendientes = reservas
+    .filter((r) => r.estado === 'pendiente')
+    .map(formatearAsistente);
+  const canceladasTotal = reservas.filter((r) => r.estado === 'cancelada').length;
+
+  const nombreClase = clase.nombre || 'Clase';
+  const nombreRecinto = clase.recinto?.nombre || 'Recinto asignado';
+  const instructorObj =
+    clase.instructor && typeof clase.instructor === 'object' ? clase.instructor : null;
+  const etiquetaInstructor = instructorObj
+    ? instructorObj.nombreUsuario
+      ? `${instructorObj.nombreUsuario} (${instructorObj.correo})`
+      : instructorObj.correo
+    : 'Por asignar';
+
+  const sufijoFecha = fecha ? ` (${fecha})` : '';
+  const asunto = `Lista de confirmados · ${nombreClase}${sufijoFecha}`;
+
+  const lineasConfirmados =
+    confirmadas.length > 0
+      ? confirmadas
+          .map((item, idx) => `${idx + 1}. ${item.etiqueta} — ${item.fecha} · ${item.horario}`)
+          .join('\n')
+      : 'Ningún asistente confirmado hasta el momento.';
+
+  const lineasPendientes =
+    pendientes.length > 0
+      ? pendientes
+          .map((item, idx) => `${idx + 1}. ${item.etiqueta} — ${item.fecha} · ${item.horario}`)
+          .join('\n')
+      : 'Sin reservas pendientes.';
+
+  const texto = [
+    `Reporte de asistencia para la clase: ${nombreClase}${sufijoFecha}`,
+    `Recinto: ${nombreRecinto}`,
+    `Instructor: ${etiquetaInstructor}`,
+    `Resumen: ${confirmadas.length} confirmada(s), ${pendientes.length} pendiente(s), ${canceladasTotal} cancelada(s).`,
+    '',
+    '=== CLIENTES CONFIRMADOS ===',
+    lineasConfirmados,
+    '',
+    '=== CLIENTES PENDIENTES POR CONFIRMAR ===',
+    lineasPendientes,
+  ].join('\n');
+
+  const itemsHtmlConfirmados =
+    confirmadas.length > 0
+      ? `<ol>${confirmadas
+          .map(
+            (item) =>
+              `<li><strong>${escaparHtml(item.etiqueta)}</strong> — ${escaparHtml(
+                item.fecha
+              )} · ${escaparHtml(item.horario)}</li>`
+          )
+          .join('')}</ol>`
+      : '<p><em>Ningún asistente confirmado hasta el momento.</em></p>';
+
+  const itemsHtmlPendientes =
+    pendientes.length > 0
+      ? `<ol>${pendientes
+          .map(
+            (item) =>
+              `<li>${escaparHtml(item.etiqueta)} — ${escaparHtml(
+                item.fecha
+              )} · ${escaparHtml(item.horario)}</li>`
+          )
+          .join('')}</ol>`
+      : '<p><em>Sin reservas pendientes.</em></p>';
+
+  const html = [
+    `<h3>Lista de asistencia · ${escaparHtml(nombreClase)}${escaparHtml(sufijoFecha)}</h3>`,
+    `<p><strong>Recinto:</strong> ${escaparHtml(nombreRecinto)}<br/>`,
+    `<strong>Instructor:</strong> ${escaparHtml(etiquetaInstructor)}<br/>`,
+    `<strong>Totales:</strong> ${confirmadas.length} confirmada(s) · ${pendientes.length} pendiente(s) · ${canceladasTotal} cancelada(s)</p>`,
+    `<h4>Clientes Confirmados (${confirmadas.length})</h4>`,
+    itemsHtmlConfirmados,
+    `<h4>Clientes Pendientes (${pendientes.length})</h4>`,
+    itemsHtmlPendientes,
+  ].join('');
+
+  return {
+    clase,
+    fecha: fecha || null,
+    totales: {
+      confirmadas: confirmadas.length,
+      pendientes: pendientes.length,
+      canceladas: canceladasTotal,
+      total: confirmadas.length + pendientes.length + canceladasTotal,
+    },
+    confirmadas,
+    pendientes,
+    asunto,
+    texto,
+    html,
+  };
+}
+
+async function enviarMensajeDirecto({
+  destinatario,
+  asunto,
+  mensaje,
+  html = '',
+  tipo = 'sistema',
+}) {
+  if (!destinatario) return [];
+  const asuntoLimpio = String(asunto || 'Mensaje de administración · FitBook').trim();
+  const mensajeLimpio = String(mensaje || '').trim();
+  const htmlFinal =
+    html ||
+    `<p>${escaparHtml(mensajeLimpio).replaceAll('\n', '<br/>')}</p>`;
+
+  const resultados = [];
+
+  if (destinatario.correo) {
+    try {
+      const respuesta = await emailAdapter.enviar({
+        destino: destinatario.correo,
+        asunto: asuntoLimpio,
+        texto: mensajeLimpio,
+        html: htmlFinal,
+      });
+      const estado = respuesta?.estado === 'omitido' ? 'omitido' : 'enviado';
+      await registrarNotificacion({
+        reserva: null,
+        destinatario: destinatario._id || null,
+        tipo,
+        canal: 'email',
+        destino: destinatario.correo,
+        asunto: asuntoLimpio,
+        mensaje: mensajeLimpio,
+        estado,
+        proveedorId: respuesta?.proveedorId || null,
+        error: respuesta?.motivo || null,
+        fechaEnvio: estado === 'enviado' ? new Date() : null,
+        leida: false,
+      });
+      resultados.push({ canal: 'email', destino: destinatario.correo, estado });
+    } catch (err) {
+      await registrarNotificacion({
+        reserva: null,
+        destinatario: destinatario._id || null,
+        tipo,
+        canal: 'email',
+        destino: destinatario.correo,
+        asunto: asuntoLimpio,
+        mensaje: mensajeLimpio,
+        estado: 'fallido',
+        error: err.message,
+        fechaEnvio: null,
+        leida: false,
+      });
+      resultados.push({
+        canal: 'email',
+        destino: destinatario.correo,
+        estado: 'fallido',
+        error: err.message,
+      });
+    }
+  }
+
+  await registrarNotificacionNavegacion({
+    destinatario: destinatario._id,
+    asunto: asuntoLimpio,
+    mensaje: mensajeLimpio,
+    tipo,
+  });
+  resultados.push({
+    canal: 'navegacion',
+    destino: String(destinatario._id || ''),
+    estado: 'enviado',
+  });
+
+  return resultados;
+}
+
 module.exports = {
   generarTokenAsistencia,
   verificarTokenAsistencia,
@@ -612,6 +844,8 @@ module.exports = {
   reenviarNotificacion,
   construirResumenInstructor,
   enviarResumenInstructor,
+  construirListaConfirmadosPorClase,
+  enviarMensajeDirecto,
   enviarBienvenida,
   registrarNotificacionNavegacion,
   listarNotificacionesNavegacion,

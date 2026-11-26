@@ -7,6 +7,8 @@ const {
   reenviarNotificacion,
   construirResumenInstructor,
   enviarResumenInstructor,
+  construirListaConfirmadosPorClase,
+  enviarMensajeDirecto,
   listarNotificacionesNavegacion,
 } = require('../services/notificaciones.service');
 
@@ -195,6 +197,137 @@ async function marcarLeida(req, res) {
   }
 }
 
+const ROLES_DESTINO_VALIDOS = ['cliente', 'instructor', 'coordinador', 'administrador', 'todos'];
+
+async function enviarMensaje(req, res) {
+  try {
+    const {
+      destinatarioId = '',
+      rolDestino = '',
+      asunto = '',
+      mensaje = '',
+      claseId = '',
+      fecha = '',
+    } = req.body || {};
+
+    let reporteClase = null;
+    if (claseId && String(claseId).trim()) {
+      reporteClase = await construirListaConfirmadosPorClase({
+        claseId: String(claseId).trim(),
+        fecha: String(fecha || '').trim(),
+      });
+      if (!reporteClase) {
+        return res.status(404).json({ mensaje: 'La clase seleccionada no existe' });
+      }
+    }
+
+    const asuntoBase = String(asunto || '').trim();
+    const mensajeBase = String(mensaje || '').trim();
+
+    if (!reporteClase && !mensajeBase) {
+      return res.status(400).json({
+        mensaje: 'Debes escribir un mensaje o seleccionar una clase para adjuntar su lista de confirmados',
+      });
+    }
+
+    let destinatarios = [];
+    const destIdLimpio = String(destinatarioId || '').trim();
+    const rolLimpio = String(rolDestino || '').trim();
+
+    if (destIdLimpio && destIdLimpio !== 'instructor_clase') {
+      const usuario = await User.findById(destIdLimpio);
+      if (!usuario || usuario.activo === false) {
+        return res.status(404).json({ mensaje: 'Destinatario no encontrado' });
+      }
+      destinatarios = [usuario];
+    } else if (rolLimpio) {
+      if (!ROLES_DESTINO_VALIDOS.includes(rolLimpio)) {
+        return res.status(400).json({ mensaje: 'El rol de destino no es válido' });
+      }
+      const filtroUsuarios = { activo: { $ne: false } };
+      if (rolLimpio !== 'todos') {
+        filtroUsuarios.rol = rolLimpio;
+      }
+      const encontrados = await User.find(filtroUsuarios);
+      destinatarios = Array.isArray(encontrados) ? encontrados : [];
+    } else if (reporteClase) {
+      const inst = reporteClase.clase?.instructor;
+      const instId = inst?._id || inst;
+      if (inst && typeof inst === 'object' && inst.correo) {
+        destinatarios = [inst];
+      } else if (instId) {
+        const usuarioInst = await User.findById(instId);
+        if (usuarioInst) destinatarios = [usuarioInst];
+      }
+    }
+
+    if (!destinatarios.length) {
+      return res.status(404).json({
+        mensaje: 'No se encontraron destinatarios activos para enviar el correo',
+      });
+    }
+
+    const asuntoFinal =
+      asuntoBase ||
+      (reporteClase ? reporteClase.asunto : 'Comunicado de administración · FitBook');
+
+    const mensajeFinal =
+      reporteClase && mensajeBase
+        ? `${mensajeBase}\n\n${reporteClase.texto}`
+        : reporteClase
+        ? reporteClase.texto
+        : mensajeBase;
+
+    const htmlFinal =
+      reporteClase && mensajeBase
+        ? `<p>${mensajeBase
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('\n', '<br/>')}</p><hr/>${reporteClase.html}`
+        : reporteClase
+        ? reporteClase.html
+        : '';
+
+    const tipoNotificacion = reporteClase ? 'resumen_instructor' : 'sistema';
+
+    const resultados = [];
+    for (const usuarioDestino of destinatarios) {
+      const envios = await enviarMensajeDirecto({
+        destinatario: usuarioDestino,
+        asunto: asuntoFinal,
+        mensaje: mensajeFinal,
+        html: htmlFinal,
+        tipo: tipoNotificacion,
+      });
+      resultados.push({
+        usuarioId: usuarioDestino._id,
+        correo: usuarioDestino.correo,
+        rol: usuarioDestino.rol,
+        canales: envios,
+      });
+    }
+
+    return res.json({
+      mensaje: `Correo enviado a ${destinatarios.length} destinatario(s)`,
+      asunto: asuntoFinal,
+      totalDestinatarios: destinatarios.length,
+      resumenClase: reporteClase
+        ? {
+            clase: reporteClase.clase?.nombre,
+            fecha: reporteClase.fecha,
+            totales: reporteClase.totales,
+            confirmadas: reporteClase.confirmadas,
+            pendientes: reporteClase.pendientes,
+          }
+        : null,
+      resultados,
+    });
+  } catch (err) {
+    return res.status(500).json({ mensaje: 'Error al enviar el correo a los destinatarios' });
+  }
+}
+
 module.exports = {
   confirmarAsistenciaPorToken,
   listarNotificaciones,
@@ -202,4 +335,5 @@ module.exports = {
   marcarLeida,
   reenviar,
   enviarResumen,
+  enviarMensaje,
 };

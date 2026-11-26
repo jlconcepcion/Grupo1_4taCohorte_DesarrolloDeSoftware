@@ -180,6 +180,11 @@ export const notificacionesApi = {
       method: 'POST',
       body: JSON.stringify({ instructorId }),
     }),
+  enviarMensaje: (datos) =>
+    peticion('/notificaciones/enviar-mensaje', {
+      method: 'POST',
+      body: JSON.stringify(datos),
+    }),
 };
 
 export const preferenciasApi = {
